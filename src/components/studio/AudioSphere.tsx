@@ -10,32 +10,32 @@ import {
   smoothChromesthesiaColor,
   aggregateFrequencyBands,
   gaussianSmooth1D,
+  laplacianSmoothY,
 } from '@/lib/chromesthesia';
 
-const SEGMENTS = 96;
-const RINGS = 64;
+const SIZE = 8;
+const SEGMENTS = 80;
+const VERTEX_COUNT = (SEGMENTS + 1) * (SEGMENTS + 1);
 
-function ChromesthesiaSphere() {
+function ChromesthesiaSurface() {
   const meshRef = useRef<THREE.Mesh>(null);
   const timeRef = useRef(0);
+  const groupRef = useRef<THREE.Group>(null);
 
   const analyser = useAudioAnalyser();
 
-  // Store base positions for displacement reference
-  const basePositions = useMemo(() => {
-    const geo = new THREE.SphereGeometry(2, SEGMENTS, RINGS);
-    return new Float32Array(geo.attributes.position.array);
-  }, []);
+  // Smoothed frequency bands for temporal interpolation
+  const smoothedBands = useRef(new Float32Array(SEGMENTS + 1));
 
   const geometry = useMemo(() => {
-    const geo = new THREE.SphereGeometry(2, SEGMENTS, RINGS);
-    const colors = new Float32Array(geo.attributes.position.count * 3);
+    const geo = new THREE.PlaneGeometry(SIZE, SIZE, SEGMENTS, SEGMENTS);
+    geo.rotateX(-Math.PI / 2);
+
+    const colors = new Float32Array(VERTEX_COUNT * 3);
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
     return geo;
   }, []);
-
-  // Smoothed band values for interpolation
-  const smoothedBands = useRef(new Float32Array(SEGMENTS + 1));
 
   useFrame((_state, delta) => {
     if (!meshRef.current) return;
@@ -50,27 +50,30 @@ function ChromesthesiaSphere() {
     const normFreq = analyser.normalizedFrequency;
     const hasAudio = isPlaying && normFreq.length > 0 && normFreq.some((v: number) => v > 0);
 
-    // Get frequency bands
+    // Get frequency bands matching grid columns
     let bands: number[];
     if (hasAudio) {
       const raw = aggregateFrequencyBands(normFreq, SEGMENTS + 1);
-      bands = gaussianSmooth1D(raw, 3);
+      bands = gaussianSmooth1D(raw, 4);
     } else {
-      // Procedural breathing animation
+      // Procedural Mathematica-style surface
       bands = [];
       for (let i = 0; i <= SEGMENTS; i++) {
-        const nx = i / SEGMENTS;
-        const wave1 = Math.sin(t * 1.2 + nx * Math.PI * 4) * 0.15;
-        const wave2 = Math.sin(t * 0.8 + nx * Math.PI * 6) * 0.1;
-        const wave3 = Math.cos(t * 0.5 + nx * Math.PI * 2) * 0.08;
-        const breathe = Math.sin(t * 0.3) * 0.05 + 0.12;
-        bands.push(Math.max(0.02, wave1 + wave2 + wave3 + breathe));
+        const x = i / SEGMENTS;
+        const bass = Math.exp(-x * 8) * 0.5;
+        const mid = Math.exp(-Math.pow(x - 0.3, 2) * 30) * 0.4;
+        const presence = Math.exp(-Math.pow(x - 0.55, 2) * 50) * 0.3;
+        const air = Math.exp(-Math.pow(x - 0.8, 2) * 70) * 0.15;
+        const mod1 = Math.sin(t * 1.5 + x * 12) * 0.06;
+        const mod2 = Math.sin(t * 2.2 + x * 8) * 0.04;
+        const breathe = Math.sin(t * 0.4) * 0.04 + 0.05;
+        bands.push(Math.max(0.02, bass + mid + presence + air + mod1 + mod2 + breathe));
       }
     }
 
-    // Temporal smoothing
+    // Temporal smoothing — exponential moving average
     const prev = smoothedBands.current;
-    const alpha = 0.15;
+    const alpha = 0.2;
     for (let i = 0; i <= SEGMENTS; i++) {
       prev[i] += (bands[i] - prev[i]) * alpha;
     }
@@ -80,72 +83,75 @@ function ChromesthesiaSphere() {
     const posArr = positions.array as Float32Array;
     const colArr = colors.array as Float32Array;
 
+    const scale = 4.0;
+
+    // Displace Y by frequency amplitude, cross-faded along Z
     for (let i = 0; i < positions.count; i++) {
-      // Get base position on unit sphere
-      const bx = basePositions[i * 3];
-      const by = basePositions[i * 3 + 1];
-      const bz = basePositions[i * 3 + 2];
+      const ix = i % (SEGMENTS + 1);
+      const iy = Math.floor(i / (SEGMENTS + 1));
 
-      // Spherical coordinates from base position
-      const r = Math.sqrt(bx * bx + by * by + bz * bz);
-      const theta = Math.acos(by / r); // polar angle (0 = top, PI = bottom)
-      const phi = Math.atan2(bz, bx);   // azimuthal angle
+      const bandValue = prev[ix];
+      const crossBand = prev[iy];
 
-      // Map theta to frequency band (top = low freq, bottom = high freq)
-      const freqNorm = theta / Math.PI;
-      const bandIdx = Math.min(SEGMENTS, Math.floor(freqNorm * SEGMENTS));
-      const bandValue = prev[bandIdx];
+      // Cross-fade between X-freq and Y-freq for 3D depth
+      const height = (bandValue * 0.7 + crossBand * 0.3) * scale;
 
-      // Also use phi for secondary modulation
-      const phiMod = Math.sin(phi * 3 + t * 0.5) * 0.03;
+      // Add subtle wave for organic feel
+      const nx = ix / SEGMENTS;
+      const ny = iy / SEGMENTS;
+      const wave = Math.sin(t * 0.8 + nx * 6 + ny * 4) * 0.08 * scale;
 
-      // Displacement: radial push based on amplitude
-      const displacement = 1.0 + bandValue * 2.5 + phiMod;
+      posArr[i * 3 + 1] = height + wave;
+    }
 
-      // Normalize direction and apply displacement
-      const nx = bx / r;
-      const ny = by / r;
-      const nz = bz / r;
-      posArr[i * 3] = nx * r * displacement;
-      posArr[i * 3 + 1] = ny * r * displacement;
-      posArr[i * 3 + 2] = nz * r * displacement;
+    // Laplacian mesh smoothing for silky surface
+    laplacianSmoothY(posArr, SEGMENTS + 1, SEGMENTS + 1, 3);
 
-      // Color: chromesthesia based on frequency position + amplitude
-      const [cr, cg, cb] = smoothChromesthesiaColor(freqNorm, Math.min(1, bandValue * 1.5));
-      colArr[i * 3] = cr;
-      colArr[i * 3 + 1] = cg;
-      colArr[i * 3 + 2] = cb;
+    // Color based on actual pitch content at each vertex
+    for (let i = 0; i < positions.count; i++) {
+      const ix = i % (SEGMENTS + 1);
+      const freqNorm = ix / SEGMENTS;
+      // Read back the smoothed height for amplitude
+      const amp = Math.min(1, Math.max(0, posArr[i * 3 + 1] / scale));
+
+      const [r, g, b] = smoothChromesthesiaColor(freqNorm, amp);
+      colArr[i * 3] = r;
+      colArr[i * 3 + 1] = g;
+      colArr[i * 3 + 2] = b;
     }
 
     positions.needsUpdate = true;
     colors.needsUpdate = true;
     geometry.computeVertexNormals();
 
-    // Slow rotation
-    meshRef.current.rotation.y += delta * 0.1;
-    meshRef.current.rotation.x = Math.sin(t * 0.15) * 0.1;
+    // Slow auto-rotation
+    if (groupRef.current) {
+      groupRef.current.rotation.y += delta * 0.06;
+    }
   });
 
   return (
-    <mesh ref={meshRef} geometry={geometry}>
-      <meshStandardMaterial
-        vertexColors
-        side={THREE.DoubleSide}
-        roughness={0.4}
-        metalness={0.15}
-        toneMapped={false}
-      />
-    </mesh>
+    <group ref={groupRef}>
+      <mesh ref={meshRef} geometry={geometry}>
+        <meshStandardMaterial
+          vertexColors
+          side={THREE.DoubleSide}
+          roughness={0.5}
+          metalness={0.1}
+          toneMapped={false}
+        />
+      </mesh>
+    </group>
   );
 }
 
 export default function AudioSphere() {
   return (
     <Canvas3D
-      camera={{ position: [0, 0, 7], fov: 50 }}
+      camera={{ position: [0, 4, 7], fov: 50 }}
       className="w-full h-full"
     >
-      <ChromesthesiaSphere />
+      <ChromesthesiaSurface />
     </Canvas3D>
   );
 }
