@@ -1,43 +1,16 @@
 'use client';
 
-import { useRef, useEffect, useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import SplitScreen from '@/components/contrast/SplitScreen';
 import SpectralComparison from '@/components/contrast/SpectralComparison';
 import AudioUpload from '@/components/audio/AudioUpload';
 import { useAudioStore } from '@/stores/audioStore';
-import { useAudioAnalyser } from '@/components/audio/useAudioAnalyser';
 
 export default function ContrastPage() {
   const isPlaying = useAudioStore((s) => s.isPlaying);
   const play = useAudioStore((s) => s.play);
   const pause = useAudioStore((s) => s.pause);
   const fileName = useAudioStore((s) => s.fileName);
-
-  const { normalizedFrequency, update } = useAudioAnalyser();
-  const audioDataRef = useRef<Float32Array>(normalizedFrequency);
-  const rafRef = useRef<number>(0);
-  const [, setTick] = useState(0);
-
-  // Update audioDataRef when normalizedFrequency ref identity changes
-  audioDataRef.current = normalizedFrequency;
-
-  // Animation loop: call update() every frame to pull fresh FFT data
-  useEffect(() => {
-    const loop = () => {
-      update();
-      // Force a re-render so child components receive fresh audioData
-      setTick((t) => t + 1);
-      rafRef.current = requestAnimationFrame(loop);
-    };
-
-    if (isPlaying) {
-      rafRef.current = requestAnimationFrame(loop);
-    }
-
-    return () => {
-      cancelAnimationFrame(rafRef.current);
-    };
-  }, [isPlaying, update]);
 
   const handlePlayPause = useCallback(() => {
     if (isPlaying) {
@@ -76,7 +49,6 @@ export default function ContrastPage() {
             theme: 'grey',
           }}
           isPlaying={isPlaying}
-          audioData={audioDataRef.current}
         />
       </div>
 
@@ -128,7 +100,7 @@ export default function ContrastPage() {
 
       {/* Spectral comparison below */}
       <div className="px-8 pb-12 animate-fade-in-delay-2">
-        <SpectralComparison isPlaying={isPlaying} audioData={audioDataRef.current} />
+        <SpectralComparison isPlaying={isPlaying} />
       </div>
     </div>
   );

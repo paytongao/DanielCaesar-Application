@@ -1,215 +1,252 @@
 'use client';
 
-import { useRef, useEffect, useCallback } from 'react';
-import { PURPLE_PALETTE, GREY_PALETTE } from '@/components/shared/ColorUtils';
+import { useRef, useMemo } from 'react';
+import * as THREE from 'three';
+import { useFrame } from '@react-three/fiber';
+import Canvas3D from '@/components/shared/Canvas3D';
+import { useAudioStore } from '@/stores/audioStore';
+import { useAudioAnalyser } from '@/components/audio/useAudioAnalyser';
+import { frequencyBinToColor, aggregateFrequencyBands } from '@/lib/chromesthesia';
 
 interface SpectralComparisonProps {
   isPlaying: boolean;
-  audioData?: Float32Array;
 }
 
-export default function SpectralComparison({ isPlaying, audioData }: SpectralComparisonProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animRef = useRef<number>(0);
+const FREQ_BINS = 128;
+const TIME_ROWS = 32;
+const VERTEX_COUNT = FREQ_BINS * TIME_ROWS;
+const X_SPACING = 0.06;
+const Z_SPACING = 0.12;
+
+function buildIndices(): Uint32Array {
+  const indices: number[] = [];
+  for (let row = 0; row < TIME_ROWS - 1; row++) {
+    for (let col = 0; col < FREQ_BINS - 1; col++) {
+      const a = row * FREQ_BINS + col;
+      const b = a + 1;
+      const c = (row + 1) * FREQ_BINS + col;
+      const d = c + 1;
+      indices.push(a, c, b);
+      indices.push(b, c, d);
+    }
+  }
+  return new Uint32Array(indices);
+}
+
+function FrequencySurface3D() {
+  const purpleMeshRef = useRef<THREE.Mesh>(null);
+  const greyMeshRef = useRef<THREE.Mesh>(null);
   const timeRef = useRef(0);
 
-  const draw = useCallback((ctx: CanvasRenderingContext2D, w: number, h: number) => {
+  const analyser = useAudioAnalyser();
+
+  // Ring buffers for FFT history
+  const purpleHistoryRef = useRef(new Float32Array(FREQ_BINS * TIME_ROWS));
+  const greyHistoryRef = useRef(new Float32Array(FREQ_BINS * TIME_ROWS));
+
+  const indices = useMemo(() => buildIndices(), []);
+
+  // Create geometries
+  const purpleGeom = useMemo(() => {
+    const geom = new THREE.BufferGeometry();
+    const positions = new Float32Array(VERTEX_COUNT * 3);
+    const colors = new Float32Array(VERTEX_COUNT * 3);
+
+    // Initialize grid positions
+    for (let row = 0; row < TIME_ROWS; row++) {
+      for (let col = 0; col < FREQ_BINS; col++) {
+        const idx = (row * FREQ_BINS + col) * 3;
+        positions[idx] = (col - FREQ_BINS / 2) * X_SPACING;
+        positions[idx + 1] = 0;
+        positions[idx + 2] = row * Z_SPACING;
+      }
+    }
+
+    geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geom.setIndex(new THREE.BufferAttribute(indices, 1));
+    geom.computeVertexNormals();
+    return geom;
+  }, [indices]);
+
+  const greyGeom = useMemo(() => {
+    const geom = new THREE.BufferGeometry();
+    const positions = new Float32Array(VERTEX_COUNT * 3);
+    const colors = new Float32Array(VERTEX_COUNT * 3);
+
+    for (let row = 0; row < TIME_ROWS; row++) {
+      for (let col = 0; col < FREQ_BINS; col++) {
+        const idx = (row * FREQ_BINS + col) * 3;
+        positions[idx] = (col - FREQ_BINS / 2) * X_SPACING;
+        positions[idx + 1] = 0;
+        positions[idx + 2] = row * Z_SPACING + 0.5;
+      }
+    }
+
+    geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geom.setIndex(new THREE.BufferAttribute(indices, 1));
+    geom.computeVertexNormals();
+    return geom;
+  }, [indices]);
+
+  // Grid lines geometry
+  const gridGeom = useMemo(() => {
+    const points: number[] = [];
+    const xMin = -FREQ_BINS / 2 * X_SPACING;
+    const xMax = FREQ_BINS / 2 * X_SPACING;
+    const zMin = 0;
+    const zMax = TIME_ROWS * Z_SPACING;
+
+    // Horizontal lines (along X)
+    for (let row = 0; row <= TIME_ROWS; row += 4) {
+      const z = row * Z_SPACING;
+      points.push(xMin, -0.01, z, xMax, -0.01, z);
+    }
+    // Vertical lines (along Z)
+    for (let col = 0; col <= FREQ_BINS; col += 16) {
+      const x = (col - FREQ_BINS / 2) * X_SPACING;
+      points.push(x, -0.01, zMin, x, -0.01, zMax);
+    }
+
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
+    return geom;
+  }, []);
+
+  useFrame((_state, delta) => {
+    const isPlaying = useAudioStore.getState().isPlaying;
+
     if (isPlaying) {
-      timeRef.current += 0.016;
+      timeRef.current += delta;
+      analyser.update();
     }
     const t = timeRef.current;
 
-    ctx.clearRect(0, 0, w, h);
+    const normFreq = analyser.normalizedFrequency;
+    const hasAudio = isPlaying && normFreq.length > 0 && normFreq.some((v: number) => v > 0);
 
-    // Dark background
-    ctx.fillStyle = '#0a0a0a';
-    ctx.fillRect(0, 0, w, h);
+    // Get current FFT bands
+    let purpleBands: number[];
+    let greyBands: number[];
 
-    // Grid lines
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
-    ctx.lineWidth = 0.5;
-    for (let i = 0; i <= 10; i++) {
-      const y = (h * 0.1) + (h * 0.8) * (i / 10);
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(w, y);
-      ctx.stroke();
-    }
-    for (let i = 0; i <= 20; i++) {
-      const x = w * (i / 20);
-      ctx.beginPath();
-      ctx.moveTo(x, h * 0.1);
-      ctx.lineTo(x, h * 0.9);
-      ctx.stroke();
-    }
-
-    // Labels
-    ctx.font = '10px monospace';
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-    ctx.textAlign = 'left';
-    ctx.fillText('FREQUENCY (Hz)', 10, h * 0.97);
-    ctx.save();
-    ctx.translate(12, h * 0.5);
-    ctx.rotate(-Math.PI / 2);
-    ctx.textAlign = 'center';
-    ctx.fillText('AMPLITUDE', 0, 0);
-    ctx.restore();
-
-    const POINTS = 256;
-    const baseY = h * 0.65;
-    const maxAmp = h * 0.45;
-
-    // Check if real audio data is available
-    const hasAudio = audioData && audioData.length > 0 && audioData.some((v) => v > 0);
-
-    // Generate purple curve (dynamic, alive)
-    const generatePurpleCurve = (): number[] => {
-      if (hasAudio) {
-        // Map real FFT data to 256 points
-        const pts: number[] = [];
-        for (let i = 0; i < POINTS; i++) {
-          const binIndex = Math.floor((i / POINTS) * audioData.length);
-          pts.push(audioData[Math.min(binIndex, audioData.length - 1)]);
-        }
-        return pts;
-      }
-
-      const pts: number[] = [];
-      for (let i = 0; i < POINTS; i++) {
-        const nx = i / POINTS;
-        // Frequency response with resonant peaks
+    if (hasAudio) {
+      purpleBands = aggregateFrequencyBands(normFreq, FREQ_BINS);
+      greyBands = purpleBands.map((v) => v * 0.1);
+    } else {
+      // Synthetic data
+      purpleBands = [];
+      greyBands = [];
+      for (let i = 0; i < FREQ_BINS; i++) {
+        const nx = i / FREQ_BINS;
         const bass = Math.exp(-nx * 8) * 0.6;
         const mid = Math.exp(-Math.pow(nx - 0.3, 2) * 40) * 0.5;
         const presence = Math.exp(-Math.pow(nx - 0.55, 2) * 60) * 0.35;
         const air = Math.exp(-Math.pow(nx - 0.8, 2) * 80) * 0.2;
-
-        // Animated modulation
         const mod1 = Math.sin(t * 1.8 + nx * 15) * 0.08;
         const mod2 = Math.sin(t * 2.7 + nx * 10) * 0.06;
-        const mod3 = Math.cos(t * 1.2 + nx * 25) * 0.04;
         const breathe = Math.sin(t * 0.5) * 0.05 + 0.05;
+        purpleBands.push(Math.max(0.02, bass + mid + presence + air + mod1 + mod2 + breathe));
 
-        const val = bass + mid + presence + air + mod1 + mod2 + mod3 + breathe;
-        pts.push(Math.max(0.02, val));
+        const gBase = 0.12 - nx * 0.06;
+        const gMod = Math.sin(t * 0.6 + nx * 5) * 0.01;
+        greyBands.push(Math.max(0.02, gBase + gMod));
       }
-      return pts;
-    };
+    }
 
-    // Generate grey curve (flat, compressed)
-    const generateGreyCurve = (): number[] => {
-      if (hasAudio) {
-        // Same FFT data but compressed to 10%
-        const pts: number[] = [];
-        for (let i = 0; i < POINTS; i++) {
-          const binIndex = Math.floor((i / POINTS) * audioData.length);
-          pts.push(audioData[Math.min(binIndex, audioData.length - 1)] * 0.1);
-        }
-        return pts;
+    // Shift history rows back (row N-1 is oldest, row 0 is newest)
+    const pHist = purpleHistoryRef.current;
+    const gHist = greyHistoryRef.current;
+    // Copy rows 0..TIME_ROWS-2 to rows 1..TIME_ROWS-1
+    pHist.copyWithin(FREQ_BINS, 0, FREQ_BINS * (TIME_ROWS - 1));
+    gHist.copyWithin(FREQ_BINS, 0, FREQ_BINS * (TIME_ROWS - 1));
+    // Insert new data at row 0
+    for (let i = 0; i < FREQ_BINS; i++) {
+      pHist[i] = purpleBands[i];
+      gHist[i] = greyBands[i];
+    }
+
+    // Update purple geometry
+    const pPos = purpleGeom.getAttribute('position') as THREE.BufferAttribute;
+    const pCol = purpleGeom.getAttribute('color') as THREE.BufferAttribute;
+    const pPosArr = pPos.array as Float32Array;
+    const pColArr = pCol.array as Float32Array;
+
+    for (let row = 0; row < TIME_ROWS; row++) {
+      for (let col = 0; col < FREQ_BINS; col++) {
+        const vi = row * FREQ_BINS + col;
+        const amplitude = pHist[row * FREQ_BINS + col];
+        pPosArr[vi * 3 + 1] = amplitude * 3.0;
+
+        const [r, g, b] = frequencyBinToColor(col * 8, amplitude);
+        pColArr[vi * 3] = r;
+        pColArr[vi * 3 + 1] = g;
+        pColArr[vi * 3 + 2] = b;
       }
+    }
+    pPos.needsUpdate = true;
+    pCol.needsUpdate = true;
+    purpleGeom.computeVertexNormals();
 
-      const pts: number[] = [];
-      for (let i = 0; i < POINTS; i++) {
-        const nx = i / POINTS;
-        const base = 0.12 - nx * 0.06;
-        const mod = Math.sin(t * 0.6 + nx * 5) * 0.01;
-        pts.push(Math.max(0.02, base + mod));
+    // Update grey geometry
+    const gPos = greyGeom.getAttribute('position') as THREE.BufferAttribute;
+    const gCol = greyGeom.getAttribute('color') as THREE.BufferAttribute;
+    const gPosArr = gPos.array as Float32Array;
+    const gColArr = gCol.array as Float32Array;
+
+    for (let row = 0; row < TIME_ROWS; row++) {
+      for (let col = 0; col < FREQ_BINS; col++) {
+        const vi = row * FREQ_BINS + col;
+        const amplitude = gHist[row * FREQ_BINS + col];
+        gPosArr[vi * 3 + 1] = amplitude * 3.0;
+
+        gColArr[vi * 3] = 0.35;
+        gColArr[vi * 3 + 1] = 0.35;
+        gColArr[vi * 3 + 2] = 0.35;
       }
-      return pts;
-    };
-
-    const purplePts = generatePurpleCurve();
-    const greyPts = generateGreyCurve();
-
-    // Draw fill under purple curve
-    ctx.beginPath();
-    ctx.moveTo(0, baseY);
-    for (let i = 0; i < POINTS; i++) {
-      const x = (i / POINTS) * w;
-      const y = baseY - purplePts[i] * maxAmp;
-      ctx.lineTo(x, y);
     }
-    ctx.lineTo(w, baseY);
-    ctx.closePath();
-    const purpleFill = ctx.createLinearGradient(0, baseY - maxAmp, 0, baseY);
-    purpleFill.addColorStop(0, 'rgba(124, 58, 237, 0.15)');
-    purpleFill.addColorStop(1, 'rgba(124, 58, 237, 0.02)');
-    ctx.fillStyle = purpleFill;
-    ctx.fill();
+    gPos.needsUpdate = true;
+    gCol.needsUpdate = true;
+    greyGeom.computeVertexNormals();
+  });
 
-    // Draw purple curve
-    ctx.beginPath();
-    for (let i = 0; i < POINTS; i++) {
-      const x = (i / POINTS) * w;
-      const y = baseY - purplePts[i] * maxAmp;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.strokeStyle = PURPLE_PALETTE.glow;
-    ctx.lineWidth = 2;
-    ctx.shadowColor = PURPLE_PALETTE.glow;
-    ctx.shadowBlur = 10;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
+  return (
+    <>
+      {/* Grid lines */}
+      <lineSegments geometry={gridGeom}>
+        <lineBasicMaterial color={0xffffff} opacity={0.05} transparent />
+      </lineSegments>
 
-    // Draw grey curve
-    ctx.beginPath();
-    for (let i = 0; i < POINTS; i++) {
-      const x = (i / POINTS) * w;
-      const y = baseY - greyPts[i] * maxAmp;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.strokeStyle = GREY_PALETTE.flat;
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+      {/* Purple surface */}
+      <mesh ref={purpleMeshRef} geometry={purpleGeom}>
+        <meshStandardMaterial
+          vertexColors
+          transparent
+          opacity={0.85}
+          side={THREE.DoubleSide}
+          roughness={0.5}
+          metalness={0.1}
+          toneMapped={false}
+        />
+      </mesh>
 
-    // Legend
-    const legendX = w - 220;
-    const legendY = h * 0.12;
+      {/* Grey surface */}
+      <mesh ref={greyMeshRef} geometry={greyGeom}>
+        <meshStandardMaterial
+          vertexColors
+          transparent
+          opacity={0.5}
+          side={THREE.DoubleSide}
+          roughness={0.8}
+          metalness={0.0}
+        />
+      </mesh>
+    </>
+  );
+}
 
-    ctx.fillStyle = PURPLE_PALETTE.glow;
-    ctx.fillRect(legendX, legendY, 16, 2);
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-    ctx.font = '11px monospace';
-    ctx.textAlign = 'left';
-    ctx.fillText("Won't Live Here", legendX + 24, legendY + 4);
-
-    ctx.fillStyle = GREY_PALETTE.flat;
-    ctx.fillRect(legendX, legendY + 18, 16, 2);
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
-    ctx.fillText('Temporary Lapse', legendX + 24, legendY + 22);
-  }, [isPlaying, audioData]);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const resize = () => {
-      const dpr = window.devicePixelRatio || 1;
-      const rect = canvas.getBoundingClientRect();
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-      ctx.scale(dpr, dpr);
-    };
-
-    resize();
-    window.addEventListener('resize', resize);
-
-    const loop = () => {
-      const rect = canvas.getBoundingClientRect();
-      draw(ctx, rect.width, rect.height);
-      animRef.current = requestAnimationFrame(loop);
-    };
-    animRef.current = requestAnimationFrame(loop);
-
-    return () => {
-      cancelAnimationFrame(animRef.current);
-      window.removeEventListener('resize', resize);
-    };
-  }, [draw]);
+export default function SpectralComparison({ isPlaying }: SpectralComparisonProps) {
+  void isPlaying; // managed internally via store
 
   return (
     <div className="w-full">
@@ -221,12 +258,25 @@ export default function SpectralComparison({ isPlaying, audioData }: SpectralCom
           Frequency Response Overlay
         </span>
       </div>
-      <div className="relative border border-white/5 rounded-lg overflow-hidden">
-        <canvas
-          ref={canvasRef}
-          className="w-full block"
-          style={{ height: '240px' }}
-        />
+      <div className="relative border border-white/5 rounded-lg overflow-hidden" style={{ height: '300px' }}>
+        <Canvas3D
+          camera={{ position: [0, 4, 6], fov: 50 }}
+          className="w-full h-full"
+        >
+          <FrequencySurface3D />
+        </Canvas3D>
+
+        {/* Legend overlay */}
+        <div className="absolute top-3 right-4 pointer-events-none">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-4 h-0.5 bg-purple-500" />
+            <span className="text-[10px] font-mono text-white/50">Won&apos;t Live Here</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-0.5 bg-neutral-500" />
+            <span className="text-[10px] font-mono text-white/35">Temporary Lapse</span>
+          </div>
+        </div>
       </div>
     </div>
   );

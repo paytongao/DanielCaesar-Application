@@ -14,7 +14,7 @@ interface AudioTerrainProps {
 
 const SEGMENTS = 128;
 const SIZE = 12;
-const MAX_ELEVATION = 3.0;
+const MAX_ELEVATION = 5.0;
 const TRANSITION_DURATION = 1.2; // seconds
 
 function generateHeight(x: number, z: number, released: boolean): number {
@@ -90,7 +90,7 @@ export default function AudioTerrain({ version }: AudioTerrainProps) {
   const uniforms = useMemo(
     () => ({
       uColorMode: { value: 0.0 },
-      uMaxHeight: { value: MAX_ELEVATION },
+      uMaxHeight: { value: 5.0 },
       uTime: { value: 0.0 },
       uAudioReactive: { value: 0.0 },
       uFrequencyTexture: { value: freqTexture },

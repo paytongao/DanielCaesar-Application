@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { hexToRgb } from '@/components/shared/ColorUtils';
 import { useAudioStore } from '@/stores/audioStore';
 import { useAudioAnalyser } from '@/components/audio/useAudioAnalyser';
-import { aggregateFrequencyBands } from '@/lib/chromesthesia';
+import { aggregateFrequencyBands, frequencyBinToColor } from '@/lib/chromesthesia';
 
 interface GradientSurfaceProps {
   data?: number[][];
@@ -116,7 +116,7 @@ export default function GradientSurface({
         segments + 1
       );
 
-      const scale = 2.0;
+      const scale = 3.5;
 
       for (let i = 0; i < positions.count; i++) {
         const ix = i % (segments + 1);
@@ -130,7 +130,10 @@ export default function GradientSurface({
 
         positions.setY(i, height);
 
-        // Update vertex colors based on the new height
+        // Chromesthesia color from frequency bin
+        const [cr, cg, cb] = frequencyBinToColor(ix, bandValue);
+
+        // Album palette color (height-based, for identity)
         const t = Math.max(0, Math.min(1, height / scale));
         const colorIndex = Math.min(
           Math.floor(t * (rgbColors.length - 1)),
@@ -140,12 +143,17 @@ export default function GradientSurface({
 
         const c1 = rgbColors[colorIndex];
         const c2 = rgbColors[colorIndex + 1];
+        const pr = c1[0] + (c2[0] - c1[0]) * localT;
+        const pg = c1[1] + (c2[1] - c1[1]) * localT;
+        const pb = c1[2] + (c2[2] - c1[2]) * localT;
 
+        // Blend: 60% chromesthesia + 40% album palette
+        const blend = 0.6;
         colorAttribute.setXYZ(
           i,
-          c1[0] + (c2[0] - c1[0]) * localT,
-          c1[1] + (c2[1] - c1[1]) * localT,
-          c1[2] + (c2[2] - c1[2]) * localT
+          cr * blend + pr * (1 - blend),
+          cg * blend + pg * (1 - blend),
+          cb * blend + pb * (1 - blend)
         );
       }
 

@@ -13,33 +13,30 @@ interface SplitScreenProps {
   leftVersion: VersionConfig;
   rightVersion: VersionConfig;
   isPlaying: boolean;
-  audioData?: Float32Array;
 }
 
-export default function SplitScreen({ leftVersion, rightVersion, isPlaying, audioData }: SplitScreenProps) {
+export default function SplitScreen({ leftVersion, rightVersion, isPlaying }: SplitScreenProps) {
   const [showDiff, setShowDiff] = useState(false);
 
   return (
     <div className="relative w-full h-full">
       {/* Split grid */}
-      <div className="grid grid-cols-2 w-full h-full">
+      <div className="grid grid-cols-2 w-full h-full" style={{ minHeight: '400px' }}>
         {/* Left side — Purple (released) */}
-        <div className="relative overflow-hidden">
+        <div className="relative overflow-hidden" style={{ minHeight: '400px' }}>
           <VersionVisualizer
             theme={leftVersion.theme}
             label={leftVersion.label}
             isPlaying={isPlaying}
-            audioData={audioData}
           />
         </div>
 
         {/* Right side — Grey (unreleased) */}
-        <div className="relative overflow-hidden">
+        <div className="relative overflow-hidden" style={{ minHeight: '400px' }}>
           <VersionVisualizer
             theme={rightVersion.theme}
             label={rightVersion.label}
             isPlaying={isPlaying}
-            audioData={audioData}
           />
         </div>
       </div>
