@@ -6,7 +6,7 @@ import { useFrame } from '@react-three/fiber';
 import Canvas3D from '@/components/shared/Canvas3D';
 import { useAudioStore } from '@/stores/audioStore';
 import { useAudioAnalyser } from '@/components/audio/useAudioAnalyser';
-import { frequencyBinToColor } from '@/lib/chromesthesia';
+import { smoothChromesthesiaColor } from '@/lib/chromesthesia';
 
 interface VersionVisualizerProps {
   theme: 'purple' | 'grey';
@@ -91,8 +91,8 @@ function BarGrid3D({ theme }: { theme: 'purple' | 'grey' }) {
       // Colors
       const ci = i * 3;
       if (isPurple) {
-        const binIndex = Math.floor((i / BAR_COUNT) * 1024);
-        const [r, g, b] = frequencyBinToColor(binIndex, barValue);
+        const freqNorm = i / BAR_COUNT;
+        const [r, g, b] = smoothChromesthesiaColor(freqNorm, barValue);
         colorArray[ci] = r;
         colorArray[ci + 1] = g;
         colorArray[ci + 2] = b;

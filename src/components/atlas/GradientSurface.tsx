@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { hexToRgb } from '@/components/shared/ColorUtils';
 import { useAudioStore } from '@/stores/audioStore';
 import { useAudioAnalyser } from '@/components/audio/useAudioAnalyser';
-import { aggregateFrequencyBands, frequencyBinToColor } from '@/lib/chromesthesia';
+import { aggregateFrequencyBands, smoothChromesthesiaColor, gaussianSmooth1D } from '@/lib/chromesthesia';
 
 interface GradientSurfaceProps {
   data?: number[][];
@@ -111,10 +111,11 @@ export default function GradientSurface({
       // Audio-reactive mode: drive vertices from FFT data
       analyser.update();
 
-      const bands = aggregateFrequencyBands(
+      const rawBands = aggregateFrequencyBands(
         analyser.normalizedFrequency,
         segments + 1
       );
+      const bands = gaussianSmooth1D(rawBands, 3);
 
       const scale = 3.5;
 
@@ -130,8 +131,9 @@ export default function GradientSurface({
 
         positions.setY(i, height);
 
-        // Chromesthesia color from frequency bin
-        const [cr, cg, cb] = frequencyBinToColor(ix, bandValue);
+        // Smooth chromesthesia color (Catmull-Rom spline through Scriabin hues)
+        const freqNorm = ix / (segments + 1);
+        const [cr, cg, cb] = smoothChromesthesiaColor(freqNorm, bandValue);
 
         // Album palette color (height-based, for identity)
         const t = Math.max(0, Math.min(1, height / scale));

@@ -6,7 +6,6 @@ import Link from 'next/link';
 import Canvas3D from '@/components/shared/Canvas3D';
 import GradientSurface from '@/components/atlas/GradientSurface';
 import ColorPalette from '@/components/atlas/ColorPalette';
-import AudioUpload from '@/components/audio/AudioUpload';
 import { useAudioStore } from '@/stores/audioStore';
 
 const ALBUMS: Record<string, {
@@ -147,13 +146,6 @@ export default function AlbumPage() {
             })}
           </div>
 
-          {/* Audio Upload */}
-          <div className="mt-6 pt-4 border-t border-white/[0.06]">
-            <h2 className="text-xs text-white/40 tracking-widest uppercase mb-3">
-              Audio Input
-            </h2>
-            <AudioUpload />
-          </div>
         </div>
 
         {/* Center: 3D Visualization */}

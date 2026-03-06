@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import TerrainScene from '@/components/terrain/TerrainScene';
 import TerrainControls from '@/components/terrain/TerrainControls';
-import AudioUpload from '@/components/audio/AudioUpload';
 import Link from 'next/link';
 
 export default function TerrainPage() {
@@ -46,11 +45,6 @@ export default function TerrainPage() {
         <p className="text-2xl sm:text-4xl font-extralight tracking-[0.2em] text-white/30 whitespace-nowrap select-none">
           Grey has no height
         </p>
-      </div>
-
-      {/* Audio upload — bottom left */}
-      <div className="absolute bottom-6 left-6 z-20">
-        <AudioUpload />
       </div>
 
       {/* Controls */}

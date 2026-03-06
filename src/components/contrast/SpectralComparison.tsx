@@ -6,7 +6,12 @@ import { useFrame } from '@react-three/fiber';
 import Canvas3D from '@/components/shared/Canvas3D';
 import { useAudioStore } from '@/stores/audioStore';
 import { useAudioAnalyser } from '@/components/audio/useAudioAnalyser';
-import { frequencyBinToColor, aggregateFrequencyBands } from '@/lib/chromesthesia';
+import {
+  smoothChromesthesiaColor,
+  aggregateFrequencyBands,
+  gaussianSmooth1D,
+  laplacianSmoothY,
+} from '@/lib/chromesthesia';
 
 interface SpectralComparisonProps {
   isPlaying: boolean;
@@ -17,6 +22,10 @@ const TIME_ROWS = 32;
 const VERTEX_COUNT = FREQ_BINS * TIME_ROWS;
 const X_SPACING = 0.06;
 const Z_SPACING = 0.12;
+const GAUSSIAN_SIGMA = 4; // Smoothing width in bins
+const TEMPORAL_SMOOTHING = 0.3; // Exponential moving average factor
+const LAPLACIAN_ITERATIONS = 3; // Mesh smoothing passes
+const HEIGHT_SCALE = 3.5;
 
 function buildIndices(): Uint32Array {
   const indices: number[] = [];
@@ -40,9 +49,13 @@ function FrequencySurface3D() {
 
   const analyser = useAudioAnalyser();
 
-  // Ring buffers for FFT history
+  // Ring buffers for FFT history (already smoothed)
   const purpleHistoryRef = useRef(new Float32Array(FREQ_BINS * TIME_ROWS));
   const greyHistoryRef = useRef(new Float32Array(FREQ_BINS * TIME_ROWS));
+
+  // Previous frame for temporal smoothing
+  const prevPurpleRef = useRef(new Float32Array(FREQ_BINS));
+  const prevGreyRef = useRef(new Float32Array(FREQ_BINS));
 
   const indices = useMemo(() => buildIndices(), []);
 
@@ -52,7 +65,6 @@ function FrequencySurface3D() {
     const positions = new Float32Array(VERTEX_COUNT * 3);
     const colors = new Float32Array(VERTEX_COUNT * 3);
 
-    // Initialize grid positions
     for (let row = 0; row < TIME_ROWS; row++) {
       for (let col = 0; col < FREQ_BINS; col++) {
         const idx = (row * FREQ_BINS + col) * 3;
@@ -98,12 +110,10 @@ function FrequencySurface3D() {
     const zMin = 0;
     const zMax = TIME_ROWS * Z_SPACING;
 
-    // Horizontal lines (along X)
     for (let row = 0; row <= TIME_ROWS; row += 4) {
       const z = row * Z_SPACING;
       points.push(xMin, -0.01, z, xMax, -0.01, z);
     }
-    // Vertical lines (along Z)
     for (let col = 0; col <= FREQ_BINS; col += 16) {
       const x = (col - FREQ_BINS / 2) * X_SPACING;
       points.push(x, -0.01, zMin, x, -0.01, zMax);
@@ -131,10 +141,12 @@ function FrequencySurface3D() {
     let greyBands: number[];
 
     if (hasAudio) {
-      purpleBands = aggregateFrequencyBands(normFreq, FREQ_BINS);
+      const rawBands = aggregateFrequencyBands(normFreq, FREQ_BINS);
+      // Gaussian spatial smoothing — eliminates jagged bin-to-bin noise
+      purpleBands = gaussianSmooth1D(rawBands, GAUSSIAN_SIGMA);
       greyBands = purpleBands.map((v) => v * 0.1);
     } else {
-      // Synthetic data
+      // Synthetic data — already smooth by construction
       purpleBands = [];
       greyBands = [];
       for (let i = 0; i < FREQ_BINS; i++) {
@@ -154,19 +166,27 @@ function FrequencySurface3D() {
       }
     }
 
+    // Temporal smoothing — exponential moving average between frames
+    const prevP = prevPurpleRef.current;
+    const prevG = prevGreyRef.current;
+    for (let i = 0; i < FREQ_BINS; i++) {
+      purpleBands[i] = prevP[i] + (purpleBands[i] - prevP[i]) * TEMPORAL_SMOOTHING;
+      greyBands[i] = prevG[i] + (greyBands[i] - prevG[i]) * TEMPORAL_SMOOTHING;
+      prevP[i] = purpleBands[i];
+      prevG[i] = greyBands[i];
+    }
+
     // Shift history rows back (row N-1 is oldest, row 0 is newest)
     const pHist = purpleHistoryRef.current;
     const gHist = greyHistoryRef.current;
-    // Copy rows 0..TIME_ROWS-2 to rows 1..TIME_ROWS-1
     pHist.copyWithin(FREQ_BINS, 0, FREQ_BINS * (TIME_ROWS - 1));
     gHist.copyWithin(FREQ_BINS, 0, FREQ_BINS * (TIME_ROWS - 1));
-    // Insert new data at row 0
     for (let i = 0; i < FREQ_BINS; i++) {
       pHist[i] = purpleBands[i];
       gHist[i] = greyBands[i];
     }
 
-    // Update purple geometry
+    // Update purple geometry — set Y from history
     const pPos = purpleGeom.getAttribute('position') as THREE.BufferAttribute;
     const pCol = purpleGeom.getAttribute('color') as THREE.BufferAttribute;
     const pPosArr = pPos.array as Float32Array;
@@ -176,9 +196,20 @@ function FrequencySurface3D() {
       for (let col = 0; col < FREQ_BINS; col++) {
         const vi = row * FREQ_BINS + col;
         const amplitude = pHist[row * FREQ_BINS + col];
-        pPosArr[vi * 3 + 1] = amplitude * 3.0;
+        pPosArr[vi * 3 + 1] = amplitude * HEIGHT_SCALE;
+      }
+    }
 
-        const [r, g, b] = frequencyBinToColor(col * 8, amplitude);
+    // Laplacian mesh smoothing — averages each vertex Y with neighbors
+    laplacianSmoothY(pPosArr, FREQ_BINS, TIME_ROWS, LAPLACIAN_ITERATIONS);
+
+    // Apply colors using smooth Catmull-Rom chromesthesia
+    for (let row = 0; row < TIME_ROWS; row++) {
+      for (let col = 0; col < FREQ_BINS; col++) {
+        const vi = row * FREQ_BINS + col;
+        const amplitude = pPosArr[vi * 3 + 1] / HEIGHT_SCALE; // read back smoothed amplitude
+        const freqNorm = col / FREQ_BINS;
+        const [r, g, b] = smoothChromesthesiaColor(freqNorm, Math.min(1, amplitude));
         pColArr[vi * 3] = r;
         pColArr[vi * 3 + 1] = g;
         pColArr[vi * 3 + 2] = b;
@@ -198,11 +229,21 @@ function FrequencySurface3D() {
       for (let col = 0; col < FREQ_BINS; col++) {
         const vi = row * FREQ_BINS + col;
         const amplitude = gHist[row * FREQ_BINS + col];
-        gPosArr[vi * 3 + 1] = amplitude * 3.0;
+        gPosArr[vi * 3 + 1] = amplitude * HEIGHT_SCALE;
+      }
+    }
 
-        gColArr[vi * 3] = 0.35;
-        gColArr[vi * 3 + 1] = 0.35;
-        gColArr[vi * 3 + 2] = 0.35;
+    // Laplacian smoothing on grey surface too
+    laplacianSmoothY(gPosArr, FREQ_BINS, TIME_ROWS, LAPLACIAN_ITERATIONS);
+
+    for (let row = 0; row < TIME_ROWS; row++) {
+      for (let col = 0; col < FREQ_BINS; col++) {
+        const vi = row * FREQ_BINS + col;
+        const amp = gPosArr[vi * 3 + 1] / HEIGHT_SCALE;
+        const grey = 0.25 + amp * 0.2;
+        gColArr[vi * 3] = grey;
+        gColArr[vi * 3 + 1] = grey;
+        gColArr[vi * 3 + 2] = grey;
       }
     }
     gPos.needsUpdate = true;
