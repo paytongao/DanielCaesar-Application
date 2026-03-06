@@ -5,6 +5,8 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import terrainVertexShader from '@/lib/shaders/terrainVertex.glsl';
 import terrainFragmentShader from '@/lib/shaders/terrainFragment.glsl';
+import { useAudioStore } from '@/stores/audioStore';
+import { useAudioAnalyser } from '@/components/audio/useAudioAnalyser';
 
 interface AudioTerrainProps {
   version: 'released' | 'unreleased';
@@ -54,8 +56,19 @@ export default function AudioTerrain({ version }: AudioTerrainProps) {
     startColorMode: 0,
   });
 
+  const isPlaying = useAudioStore((s) => s.isPlaying);
+  const analyser = useAudioAnalyser();
+
   const releasedHeights = useMemo(() => buildHeights(true), []);
   const unreleasedHeights = useMemo(() => buildHeights(false), []);
+
+  // FFT DataTexture: 1024 x 1, single red channel, float
+  const freqTexture = useMemo(() => {
+    const data = new Float32Array(1024);
+    const tex = new THREE.DataTexture(data, 1024, 1, THREE.RedFormat, THREE.FloatType);
+    tex.needsUpdate = true;
+    return tex;
+  }, []);
 
   const geometry = useMemo(() => {
     const geo = new THREE.PlaneGeometry(SIZE, SIZE, SEGMENTS, SEGMENTS);
@@ -79,8 +92,10 @@ export default function AudioTerrain({ version }: AudioTerrainProps) {
       uColorMode: { value: 0.0 },
       uMaxHeight: { value: MAX_ELEVATION },
       uTime: { value: 0.0 },
+      uAudioReactive: { value: 0.0 },
+      uFrequencyTexture: { value: freqTexture },
     }),
-    []
+    [freqTexture]
   );
 
   // Kick off a transition whenever version changes
@@ -112,6 +127,23 @@ export default function AudioTerrain({ version }: AudioTerrainProps) {
   useFrame((_, delta) => {
     if (materialRef.current) {
       materialRef.current.uniforms.uTime.value += delta;
+    }
+
+    // Audio-reactive FFT update
+    if (isPlaying) {
+      analyser.update();
+      const freqData = analyser.normalizedFrequency;
+      const texData = freqTexture.image.data as Float32Array;
+      for (let i = 0; i < Math.min(freqData.length, texData.length); i++) {
+        texData[i] = freqData[i];
+      }
+      freqTexture.needsUpdate = true;
+
+      if (materialRef.current) {
+        materialRef.current.uniforms.uAudioReactive.value = 1.0;
+      }
+    } else {
+      // When audio stops, freeze at last state (don't revert uAudioReactive or texture)
     }
 
     const t = transitionRef.current;

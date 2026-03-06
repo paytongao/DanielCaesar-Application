@@ -7,12 +7,13 @@ interface VersionVisualizerProps {
   theme: 'purple' | 'grey';
   label: string;
   isPlaying: boolean;
+  audioData?: Float32Array;
 }
 
 const BAR_COUNT = 48;
 const SMOOTHING = 0.12;
 
-export default function VersionVisualizer({ theme, label, isPlaying }: VersionVisualizerProps) {
+export default function VersionVisualizer({ theme, label, isPlaying, audioData }: VersionVisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animRef = useRef<number>(0);
   const barsRef = useRef<number[]>(new Array(BAR_COUNT).fill(0));
@@ -46,13 +47,28 @@ export default function VersionVisualizer({ theme, label, isPlaying }: VersionVi
     const baseY = h * 0.85;
     const maxBarH = h * 0.65;
 
+    // Check if real audio data is available (has signal)
+    const hasAudio = audioData && audioData.length > 0 && audioData.some((v) => v > 0);
+
     // Generate target values
     for (let i = 0; i < BAR_COUNT; i++) {
       const freq = i / BAR_COUNT;
       let target: number;
 
-      if (isPurple) {
-        // Energetic, dynamic — lots of harmonics and movement
+      if (hasAudio) {
+        // Map audioData bins to BAR_COUNT bars
+        const binIndex = Math.floor((i / BAR_COUNT) * audioData.length);
+        const binValue = audioData[Math.min(binIndex, audioData.length - 1)];
+
+        if (isPurple) {
+          // Full amplitude — dynamic, alive
+          target = binValue;
+        } else {
+          // Compressed to 10% — flat, muted (the contrast metaphor)
+          target = binValue * 0.1;
+        }
+      } else if (isPurple) {
+        // Synthetic fallback: Energetic, dynamic — lots of harmonics and movement
         const wave1 = Math.sin(t * 2.3 + i * 0.35) * 0.3;
         const wave2 = Math.sin(t * 3.7 + i * 0.18) * 0.25;
         const wave3 = Math.cos(t * 1.1 + i * 0.55) * 0.2;
@@ -66,7 +82,7 @@ export default function VersionVisualizer({ theme, label, isPlaying }: VersionVi
           target = Math.min(1, target + 0.3);
         }
       } else {
-        // Flat, muted, compressed — minimal movement
+        // Synthetic fallback: Flat, muted, compressed — minimal movement
         const wave1 = Math.sin(t * 0.8 + i * 0.12) * 0.04;
         const wave2 = Math.sin(t * 1.2 + i * 0.08) * 0.03;
         const base = 0.12 - freq * 0.04;
@@ -167,7 +183,7 @@ export default function VersionVisualizer({ theme, label, isPlaying }: VersionVi
         ctx.fill();
       }
     }
-  }, [isPlaying, isPurple]);
+  }, [isPlaying, isPurple, audioData]);
 
   useEffect(() => {
     const canvas = canvasRef.current;

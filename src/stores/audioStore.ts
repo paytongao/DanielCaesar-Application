@@ -5,6 +5,7 @@ import { create } from 'zustand';
 interface AudioState {
   isPlaying: boolean;
   currentTrack: string | null;
+  fileName: string | null;
   currentTime: number;
   duration: number;
   audioContext: AudioContext | null;
@@ -16,6 +17,7 @@ interface AudioState {
 
   initAudio: () => AudioContext;
   loadTrack: (url: string) => Promise<void>;
+  loadFile: (file: File) => Promise<void>;
   play: () => void;
   pause: () => void;
   stop: () => void;
@@ -26,6 +28,7 @@ interface AudioState {
 export const useAudioStore = create<AudioState>((set, get) => ({
   isPlaying: false,
   currentTrack: null,
+  fileName: null,
   currentTime: 0,
   duration: 0,
   audioContext: null,
@@ -65,6 +68,30 @@ export const useAudioStore = create<AudioState>((set, get) => ({
     set({
       audioBuffer,
       currentTrack: url,
+      fileName: null,
+      duration: audioBuffer.duration,
+      currentTime: 0,
+      pausedAt: 0,
+      isPlaying: false,
+    });
+  },
+
+  loadFile: async (file: File) => {
+    const state = get();
+    const ctx = state.audioContext || get().initAudio();
+
+    if (state.sourceNode) {
+      state.sourceNode.stop();
+      state.sourceNode.disconnect();
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
+    const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+
+    set({
+      audioBuffer,
+      currentTrack: file.name,
+      fileName: file.name,
       duration: audioBuffer.duration,
       currentTime: 0,
       pausedAt: 0,

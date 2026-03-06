@@ -1,11 +1,51 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 import SplitScreen from '@/components/contrast/SplitScreen';
 import SpectralComparison from '@/components/contrast/SpectralComparison';
+import AudioUpload from '@/components/audio/AudioUpload';
+import { useAudioStore } from '@/stores/audioStore';
+import { useAudioAnalyser } from '@/components/audio/useAudioAnalyser';
 
 export default function ContrastPage() {
-  const [isPlaying, setIsPlaying] = useState(false);
+  const isPlaying = useAudioStore((s) => s.isPlaying);
+  const play = useAudioStore((s) => s.play);
+  const pause = useAudioStore((s) => s.pause);
+  const fileName = useAudioStore((s) => s.fileName);
+
+  const { normalizedFrequency, update } = useAudioAnalyser();
+  const audioDataRef = useRef<Float32Array>(normalizedFrequency);
+  const rafRef = useRef<number>(0);
+  const [, setTick] = useState(0);
+
+  // Update audioDataRef when normalizedFrequency ref identity changes
+  audioDataRef.current = normalizedFrequency;
+
+  // Animation loop: call update() every frame to pull fresh FFT data
+  useEffect(() => {
+    const loop = () => {
+      update();
+      // Force a re-render so child components receive fresh audioData
+      setTick((t) => t + 1);
+      rafRef.current = requestAnimationFrame(loop);
+    };
+
+    if (isPlaying) {
+      rafRef.current = requestAnimationFrame(loop);
+    }
+
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+    };
+  }, [isPlaying, update]);
+
+  const handlePlayPause = useCallback(() => {
+    if (isPlaying) {
+      pause();
+    } else {
+      play();
+    }
+  }, [isPlaying, play, pause]);
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] flex flex-col">
@@ -19,6 +59,9 @@ export default function ContrastPage() {
           {' '}
           <span className="text-neutral-500">Grey has no height.</span>
         </p>
+        <div className="mt-4 flex justify-center">
+          <AudioUpload />
+        </div>
       </div>
 
       {/* Split-screen visualizer */}
@@ -33,13 +76,14 @@ export default function ContrastPage() {
             theme: 'grey',
           }}
           isPlaying={isPlaying}
+          audioData={audioDataRef.current}
         />
       </div>
 
       {/* Play button — centered at bottom of split screen */}
       <div className="flex justify-center py-6 animate-fade-in-delay-2">
         <button
-          onClick={() => setIsPlaying((p) => !p)}
+          onClick={handlePlayPause}
           className="group relative"
           aria-label={isPlaying ? 'Pause' : 'Play'}
         >
@@ -77,14 +121,14 @@ export default function ContrastPage() {
 
           {/* Label */}
           <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[9px] font-mono tracking-widest uppercase text-white/30 whitespace-nowrap">
-            {isPlaying ? 'Pause' : 'Play Both'}
+            {isPlaying ? 'Pause' : fileName ? 'Play Both' : 'Upload Audio'}
           </span>
         </button>
       </div>
 
       {/* Spectral comparison below */}
       <div className="px-8 pb-12 animate-fade-in-delay-2">
-        <SpectralComparison isPlaying={isPlaying} />
+        <SpectralComparison isPlaying={isPlaying} audioData={audioDataRef.current} />
       </div>
     </div>
   );

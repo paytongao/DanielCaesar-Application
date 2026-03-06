@@ -13,9 +13,10 @@ interface SplitScreenProps {
   leftVersion: VersionConfig;
   rightVersion: VersionConfig;
   isPlaying: boolean;
+  audioData?: Float32Array;
 }
 
-export default function SplitScreen({ leftVersion, rightVersion, isPlaying }: SplitScreenProps) {
+export default function SplitScreen({ leftVersion, rightVersion, isPlaying, audioData }: SplitScreenProps) {
   const [showDiff, setShowDiff] = useState(false);
 
   return (
@@ -28,6 +29,7 @@ export default function SplitScreen({ leftVersion, rightVersion, isPlaying }: Sp
             theme={leftVersion.theme}
             label={leftVersion.label}
             isPlaying={isPlaying}
+            audioData={audioData}
           />
         </div>
 
@@ -37,6 +39,7 @@ export default function SplitScreen({ leftVersion, rightVersion, isPlaying }: Sp
             theme={rightVersion.theme}
             label={rightVersion.label}
             isPlaying={isPlaying}
+            audioData={audioData}
           />
         </div>
       </div>

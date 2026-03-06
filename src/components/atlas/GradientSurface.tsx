@@ -4,12 +4,16 @@ import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { hexToRgb } from '@/components/shared/ColorUtils';
+import { useAudioStore } from '@/stores/audioStore';
+import { useAudioAnalyser } from '@/components/audio/useAudioAnalyser';
+import { aggregateFrequencyBands } from '@/lib/chromesthesia';
 
 interface GradientSurfaceProps {
   data?: number[][];
   colors: string[];
   size?: number;
   segments?: number;
+  audioReactive?: boolean;
 }
 
 /**
@@ -39,9 +43,13 @@ export default function GradientSurface({
   colors,
   size = 6,
   segments = 64,
+  audioReactive = false,
 }: GradientSurfaceProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const timeRef = useRef(0);
+
+  const isPlaying = useAudioStore((s) => s.isPlaying);
+  const analyser = useAudioAnalyser();
 
   const rgbColors = useMemo(() => colors.map(hexToRgb), [colors]);
 
@@ -91,26 +99,74 @@ export default function GradientSurface({
     return geo;
   }, [heightData, rgbColors, size, segments]);
 
-  // Subtle breathing animation
+  // Animation: audio-reactive when playing, breathing when idle
   useFrame((_, delta) => {
     if (!meshRef.current) return;
     timeRef.current += delta;
 
     const positions = meshRef.current.geometry.attributes.position;
-    const baseData = heightData;
+    const colorAttribute = meshRef.current.geometry.attributes.color;
 
-    for (let i = 0; i < positions.count; i++) {
-      const ix = i % (segments + 1);
-      const iy = Math.floor(i / (segments + 1));
-      const dx = Math.min(ix, baseData[0].length - 1);
-      const dy = Math.min(iy, baseData.length - 1);
+    if (audioReactive && isPlaying) {
+      // Audio-reactive mode: drive vertices from FFT data
+      analyser.update();
 
-      const base = baseData[dy][dx];
-      const wave =
-        Math.sin(timeRef.current * 0.6 + ix * 0.15) * 0.04 +
-        Math.cos(timeRef.current * 0.4 + iy * 0.12) * 0.03;
+      const bands = aggregateFrequencyBands(
+        analyser.normalizedFrequency,
+        segments + 1
+      );
 
-      positions.setY(i, base + wave);
+      const scale = 2.0;
+
+      for (let i = 0; i < positions.count; i++) {
+        const ix = i % (segments + 1);
+        const iy = Math.floor(i / (segments + 1));
+
+        // Use the band at index ix as the primary height driver,
+        // with a subtle cross-fade from iy to add depth
+        const bandValue = bands[ix];
+        const crossBand = bands[iy];
+        const height = (bandValue * 0.75 + crossBand * 0.25) * scale;
+
+        positions.setY(i, height);
+
+        // Update vertex colors based on the new height
+        const t = Math.max(0, Math.min(1, height / scale));
+        const colorIndex = Math.min(
+          Math.floor(t * (rgbColors.length - 1)),
+          rgbColors.length - 2
+        );
+        const localT = t * (rgbColors.length - 1) - colorIndex;
+
+        const c1 = rgbColors[colorIndex];
+        const c2 = rgbColors[colorIndex + 1];
+
+        colorAttribute.setXYZ(
+          i,
+          c1[0] + (c2[0] - c1[0]) * localT,
+          c1[1] + (c2[1] - c1[1]) * localT,
+          c1[2] + (c2[2] - c1[2]) * localT
+        );
+      }
+
+      (colorAttribute as THREE.BufferAttribute).needsUpdate = true;
+    } else {
+      // Subtle breathing animation (original behavior)
+      const baseData = heightData;
+
+      for (let i = 0; i < positions.count; i++) {
+        const ix = i % (segments + 1);
+        const iy = Math.floor(i / (segments + 1));
+        const dx = Math.min(ix, baseData[0].length - 1);
+        const dy = Math.min(iy, baseData.length - 1);
+
+        const base = baseData[dy][dx];
+        const wave =
+          Math.sin(timeRef.current * 0.6 + ix * 0.15) * 0.04 +
+          Math.cos(timeRef.current * 0.4 + iy * 0.12) * 0.03;
+
+        positions.setY(i, base + wave);
+      }
     }
 
     positions.needsUpdate = true;

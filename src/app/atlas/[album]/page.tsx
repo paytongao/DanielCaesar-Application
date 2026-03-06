@@ -6,6 +6,8 @@ import Link from 'next/link';
 import Canvas3D from '@/components/shared/Canvas3D';
 import GradientSurface from '@/components/atlas/GradientSurface';
 import ColorPalette from '@/components/atlas/ColorPalette';
+import AudioUpload from '@/components/audio/AudioUpload';
+import { useAudioStore } from '@/stores/audioStore';
 
 const ALBUMS: Record<string, {
   title: string;
@@ -45,6 +47,7 @@ export default function AlbumPage() {
   const album = ALBUMS[albumSlug];
 
   const [selectedSong, setSelectedSong] = useState<number>(0);
+  const isPlaying = useAudioStore((s) => s.isPlaying);
 
   // Generate a slightly different surface seed per song
   const surfaceData = useMemo(() => {
@@ -108,7 +111,7 @@ export default function AlbumPage() {
 
       {/* Main content: track list + 3D view */}
       <div className="flex flex-col lg:flex-row gap-6 animate-fade-in-delay">
-        {/* Left panel: Track list */}
+        {/* Left panel: Track list + Audio Upload */}
         <div className="lg:w-72 shrink-0">
           <h2 className="text-xs text-white/40 tracking-widest uppercase mb-3">
             Tracks
@@ -143,6 +146,14 @@ export default function AlbumPage() {
               );
             })}
           </div>
+
+          {/* Audio Upload */}
+          <div className="mt-6 pt-4 border-t border-white/[0.06]">
+            <h2 className="text-xs text-white/40 tracking-widest uppercase mb-3">
+              Audio Input
+            </h2>
+            <AudioUpload />
+          </div>
         </div>
 
         {/* Center: 3D Visualization */}
@@ -171,6 +182,7 @@ export default function AlbumPage() {
               colors={album.palette}
               size={6}
               segments={64}
+              audioReactive={isPlaying}
             />
           </Canvas3D>
         </div>

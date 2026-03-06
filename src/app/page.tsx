@@ -14,17 +14,8 @@ export default function Home() {
           CHROMESTHESIA
         </h1>
 
-        <p className="mt-6 text-lg sm:text-xl text-white/40 font-light tracking-wide animate-fade-in-delay">
-          I&apos;ve spent 24,000 minutes with somebody I&apos;ve never met.
-        </p>
-
-        <p className="mt-4 text-sm text-white/25 font-light max-w-lg mx-auto leading-relaxed animate-fade-in-delay-2">
-          An interactive exploration of chromesthesia through the music of Daniel Caesar.
-          See the colors I hear. Feel the difference between purple fireworks and flat grey.
-        </p>
-
         {/* Navigation cards */}
-        <div className="mt-16 grid grid-cols-1 sm:grid-cols-3 gap-4 animate-fade-in-delay-2">
+        <div className="mt-16 grid grid-cols-1 sm:grid-cols-3 gap-4 animate-fade-in-delay">
           <Link
             href="/atlas"
             className="group p-6 border border-white/10 rounded-lg hover:border-purple-glow/30 transition-all duration-500 hover:bg-white/[0.02]"

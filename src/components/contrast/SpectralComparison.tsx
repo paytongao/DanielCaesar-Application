@@ -5,9 +5,10 @@ import { PURPLE_PALETTE, GREY_PALETTE } from '@/components/shared/ColorUtils';
 
 interface SpectralComparisonProps {
   isPlaying: boolean;
+  audioData?: Float32Array;
 }
 
-export default function SpectralComparison({ isPlaying }: SpectralComparisonProps) {
+export default function SpectralComparison({ isPlaying, audioData }: SpectralComparisonProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animRef = useRef<number>(0);
   const timeRef = useRef(0);
@@ -58,8 +59,21 @@ export default function SpectralComparison({ isPlaying }: SpectralComparisonProp
     const baseY = h * 0.65;
     const maxAmp = h * 0.45;
 
+    // Check if real audio data is available
+    const hasAudio = audioData && audioData.length > 0 && audioData.some((v) => v > 0);
+
     // Generate purple curve (dynamic, alive)
     const generatePurpleCurve = (): number[] => {
+      if (hasAudio) {
+        // Map real FFT data to 256 points
+        const pts: number[] = [];
+        for (let i = 0; i < POINTS; i++) {
+          const binIndex = Math.floor((i / POINTS) * audioData.length);
+          pts.push(audioData[Math.min(binIndex, audioData.length - 1)]);
+        }
+        return pts;
+      }
+
       const pts: number[] = [];
       for (let i = 0; i < POINTS; i++) {
         const nx = i / POINTS;
@@ -83,6 +97,16 @@ export default function SpectralComparison({ isPlaying }: SpectralComparisonProp
 
     // Generate grey curve (flat, compressed)
     const generateGreyCurve = (): number[] => {
+      if (hasAudio) {
+        // Same FFT data but compressed to 10%
+        const pts: number[] = [];
+        for (let i = 0; i < POINTS; i++) {
+          const binIndex = Math.floor((i / POINTS) * audioData.length);
+          pts.push(audioData[Math.min(binIndex, audioData.length - 1)] * 0.1);
+        }
+        return pts;
+      }
+
       const pts: number[] = [];
       for (let i = 0; i < POINTS; i++) {
         const nx = i / POINTS;
@@ -154,7 +178,7 @@ export default function SpectralComparison({ isPlaying }: SpectralComparisonProp
     ctx.fillRect(legendX, legendY + 18, 16, 2);
     ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
     ctx.fillText('Temporary Lapse', legendX + 24, legendY + 22);
-  }, [isPlaying]);
+  }, [isPlaying, audioData]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
