@@ -1,12 +1,18 @@
+'use client';
+
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
+
+const ChromesthesiaBlooms = dynamic(
+  () => import('@/components/home/ChromesthesiaBlooms'),
+  { ssr: false }
+);
 
 export default function Home() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden">
-      {/* Background gradient orb */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="w-[600px] h-[600px] rounded-full bg-purple-deep/20 blur-[120px] animate-pulse-glow" />
-      </div>
+      {/* Chromesthesia firework blooms */}
+      <ChromesthesiaBlooms />
 
       {/* Content */}
       <div className="relative z-10 text-center px-6 max-w-3xl">
