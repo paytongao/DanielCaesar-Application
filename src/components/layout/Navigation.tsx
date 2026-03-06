@@ -2,12 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import AudioUpload from '@/components/audio/AudioUpload';
 
 const navItems = [
   { href: '/atlas', label: 'Atlas' },
   { href: '/contrast', label: 'Contrast' },
   { href: '/terrain', label: 'Terrain' },
+  { href: '/studio', label: 'Studio' },
 ];
 
 export default function Navigation() {
@@ -18,8 +18,6 @@ export default function Navigation() {
       <Link href="/" className="text-lg font-light tracking-widest text-white/80 hover:text-white transition-colors">
         CHROMESTHESIA
       </Link>
-
-      <AudioUpload />
 
       <div className="flex gap-8">
         {navItems.map((item) => {

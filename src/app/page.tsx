@@ -10,7 +10,7 @@ const ChromesthesiaBlooms = dynamic(
 
 export default function Home() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden">
+    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden -mt-16 pt-16">
       {/* Chromesthesia firework blooms */}
       <ChromesthesiaBlooms />
 
@@ -21,7 +21,7 @@ export default function Home() {
         </h1>
 
         {/* Navigation cards */}
-        <div className="mt-16 grid grid-cols-1 sm:grid-cols-3 gap-4 animate-fade-in-delay">
+        <div className="mt-16 grid grid-cols-1 sm:grid-cols-4 gap-4 animate-fade-in-delay">
           <Link
             href="/atlas"
             className="group p-6 border border-white/10 rounded-lg hover:border-purple-glow/30 transition-all duration-500 hover:bg-white/[0.02]"
@@ -55,6 +55,18 @@ export default function Home() {
             </h2>
             <p className="mt-2 text-xs text-white/30 group-hover:text-white/50 transition-colors">
               Grey has no height
+            </p>
+          </Link>
+
+          <Link
+            href="/studio"
+            className="group p-6 border border-white/10 rounded-lg hover:border-purple-glow/30 transition-all duration-500 hover:bg-white/[0.02]"
+          >
+            <h2 className="text-sm tracking-widest uppercase text-white/60 group-hover:text-purple-light transition-colors">
+              Studio
+            </h2>
+            <p className="mt-2 text-xs text-white/30 group-hover:text-white/50 transition-colors">
+              Upload your own. See what it sounds like.
             </p>
           </Link>
         </div>
