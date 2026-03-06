@@ -116,9 +116,9 @@ function createOrb(w: number, h: number): GradientOrb {
     y: rand(h * 0.1, h * 0.9),
     vx: rand(-6, 6),
     vy: rand(-4, 4),
-    radius: rand(200, 500),
+    radius: rand(150, 350),
     color: pick(),
-    alpha: rand(0.04, 0.1),
+    alpha: rand(0.015, 0.04),
     pulseSpeed: rand(0.3, 0.8),
     pulsePhase: rand(0, Math.PI * 2),
   };
@@ -146,14 +146,14 @@ function createBloom(w: number, h: number): Bloom {
     targetY,
     colors,
     radius: 0,
-    maxRadius: rand(100, 250),
+    maxRadius: rand(70, 160),
     life: 0,
     maxLife: rand(4, 7),
     phase: 'rising',
     particles: [],
     driftX: rand(-5, 5),
     driftY: rand(-3, 1),
-    burstCount: Math.floor(rand(50, 120)),
+    burstCount: Math.floor(rand(35, 70)),
     rings: Math.floor(rand(2, 4)),
   };
 }
@@ -237,7 +237,7 @@ export default function ChromesthesiaBlooms() {
 
     // --- Layer 0: Fade previous frame (creates trails & afterglow) ---
     ctx.globalCompositeOperation = 'source-over';
-    ctx.fillStyle = 'rgba(10, 10, 10, 0.08)';
+    ctx.fillStyle = 'rgba(10, 10, 10, 0.14)';
     ctx.fillRect(0, 0, w, h);
 
     // --- Layer 1: Ambient gradient orbs (large, soft, drifting) ---
@@ -271,7 +271,7 @@ export default function ChromesthesiaBlooms() {
     spawnTimerRef.current -= dt;
     if (spawnTimerRef.current <= 0) {
       bloomsRef.current.push(createBloom(w, h));
-      spawnTimerRef.current = rand(0.5, 1.4);
+      spawnTimerRef.current = rand(0.8, 2.0);
     }
 
     // --- Layer 3: Update & draw blooms ---
@@ -307,7 +307,7 @@ export default function ChromesthesiaBlooms() {
           const flashR = bloom.maxRadius * 0.5;
           const fc = bloom.colors[0];
           const fGrad = ctx.createRadialGradient(bloom.x, bloom.y, 0, bloom.x, bloom.y, flashR);
-          fGrad.addColorStop(0, `rgba(${fc.r}, ${fc.g}, ${fc.b}, 0.12)`);
+          fGrad.addColorStop(0, `rgba(${fc.r}, ${fc.g}, ${fc.b}, 0.06)`);
           fGrad.addColorStop(0.4, `rgba(${fc.r}, ${fc.g}, ${fc.b}, 0.05)`);
           fGrad.addColorStop(1, 'rgba(0,0,0,0)');
           ctx.fillStyle = fGrad;
@@ -320,7 +320,7 @@ export default function ChromesthesiaBlooms() {
         if (bloomT > 0.3 && bloom.phase === 'blooming') bloom.phase = 'fading';
 
         // Large soft center glow — the "bloom" effect — fading gradient
-        const glowAlpha = Math.max(0, 0.06 * (1 - bloomT) * (0.6 + Math.sin(bloom.life * 2) * 0.4));
+        const glowAlpha = Math.max(0, 0.03 * (1 - bloomT) * (0.6 + Math.sin(bloom.life * 2) * 0.4));
         const glowR = bloom.maxRadius * (0.4 + bloomT * 0.6);
         for (let ci = 0; ci < Math.min(bloom.colors.length, 2); ci++) {
           const c = bloom.colors[ci];
@@ -366,7 +366,7 @@ export default function ChromesthesiaBlooms() {
           else if (pT < 0.3) alpha = 1;
           else alpha = 1 - ((pT - 0.3) / 0.7);
 
-          alpha *= 0.5;
+          alpha *= 0.3;
           alpha = Math.max(0, alpha);
 
           const { r, g, b } = particle.color;
@@ -377,7 +377,7 @@ export default function ChromesthesiaBlooms() {
             particle.x, particle.y, 0,
             particle.x, particle.y, size * 4
           );
-          pGrad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${alpha * 0.7})`);
+          pGrad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${alpha * 0.5})`);
           pGrad.addColorStop(0.25, `rgba(${r}, ${g}, ${b}, ${alpha * 0.3})`);
           pGrad.addColorStop(0.6, `rgba(${r}, ${g}, ${b}, ${alpha * 0.08})`);
           pGrad.addColorStop(1, 'rgba(0,0,0,0)');
@@ -387,7 +387,7 @@ export default function ChromesthesiaBlooms() {
           ctx.fill();
 
           // Bright core
-          const coreAlpha = alpha * 0.6;
+          const coreAlpha = alpha * 0.4;
           ctx.beginPath();
           ctx.arc(particle.x, particle.y, size * 0.6, 0, Math.PI * 2);
           ctx.fillStyle = `rgba(${Math.min(255, r + 70)}, ${Math.min(255, g + 70)}, ${Math.min(255, b + 70)}, ${coreAlpha})`;
@@ -428,12 +428,12 @@ export default function ChromesthesiaBlooms() {
     const h = window.innerHeight;
 
     // Seed ambient gradient orbs spread across the viewport
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 5; i++) {
       orbsRef.current.push(createOrb(w, h));
     }
 
     // Seed initial blooms already in progress, spread across viewport
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 3; i++) {
       const bloom = createBloom(w, h);
       bloom.phase = 'blooming';
       bloom.y = bloom.targetY;
