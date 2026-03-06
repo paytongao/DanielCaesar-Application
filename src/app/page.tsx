@@ -1,101 +1,74 @@
-import Image from "next/image";
+import Link from 'next/link';
 
 export default function Home() {
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden">
+      {/* Background gradient orb */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="w-[600px] h-[600px] rounded-full bg-purple-deep/20 blur-[120px] animate-pulse-glow" />
+      </div>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+      {/* Content */}
+      <div className="relative z-10 text-center px-6 max-w-3xl">
+        <h1 className="text-6xl sm:text-8xl font-extralight tracking-[0.2em] text-white/90 animate-fade-in">
+          CHROMESTHESIA
+        </h1>
+
+        <p className="mt-6 text-lg sm:text-xl text-white/40 font-light tracking-wide animate-fade-in-delay">
+          I&apos;ve spent 24,000 minutes with somebody I&apos;ve never met.
+        </p>
+
+        <p className="mt-4 text-sm text-white/25 font-light max-w-lg mx-auto leading-relaxed animate-fade-in-delay-2">
+          An interactive exploration of chromesthesia through the music of Daniel Caesar.
+          See the colors I hear. Feel the difference between purple fireworks and flat grey.
+        </p>
+
+        {/* Navigation cards */}
+        <div className="mt-16 grid grid-cols-1 sm:grid-cols-3 gap-4 animate-fade-in-delay-2">
+          <Link
+            href="/atlas"
+            className="group p-6 border border-white/10 rounded-lg hover:border-purple-glow/30 transition-all duration-500 hover:bg-white/[0.02]"
           >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            <h2 className="text-sm tracking-widest uppercase text-white/60 group-hover:text-purple-light transition-colors">
+              Atlas
+            </h2>
+            <p className="mt-2 text-xs text-white/30 group-hover:text-white/50 transition-colors">
+              Every album, mapped to its chromesthetic palette
+            </p>
+          </Link>
+
+          <Link
+            href="/contrast"
+            className="group p-6 border border-white/10 rounded-lg hover:border-purple-glow/30 transition-all duration-500 hover:bg-white/[0.02]"
           >
-            Read our docs
-          </a>
+            <h2 className="text-sm tracking-widest uppercase text-white/60 group-hover:text-purple-light transition-colors">
+              Contrast
+            </h2>
+            <p className="mt-2 text-xs text-white/30 group-hover:text-white/50 transition-colors">
+              Two versions. One purple. One grey.
+            </p>
+          </Link>
+
+          <Link
+            href="/terrain"
+            className="group p-6 border border-white/10 rounded-lg hover:border-purple-glow/30 transition-all duration-500 hover:bg-white/[0.02]"
+          >
+            <h2 className="text-sm tracking-widest uppercase text-white/60 group-hover:text-purple-light transition-colors">
+              Terrain
+            </h2>
+            <p className="mt-2 text-xs text-white/30 group-hover:text-white/50 transition-colors">
+              Grey has no height
+            </p>
+          </Link>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </div>
+
+      {/* Scroll indicator */}
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="1.5">
+          <path d="M12 5v14M19 12l-7 7-7-7" />
+        </svg>
+      </div>
     </div>
   );
 }

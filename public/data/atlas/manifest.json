@@ -1,0 +1,69 @@
+{
+  "albums": [
+    {
+      "slug": "freudian",
+      "title": "Freudian",
+      "year": 2017,
+      "coverUrl": "/data/atlas/freudian/cover.jpg",
+      "palette": {
+        "dominantColors": ["#8B5CF6", "#A78BFA", "#C4B5FD", "#7C3AED", "#6D28D9", "#DDD6FE"]
+      },
+      "songs": [
+        { "slug": "get-you", "title": "Get You", "duration": 253, "dataUrl": "/data/atlas/freudian/songs/get-you.json", "heatmapUrl": "/data/atlas/freudian/songs/get-you-heatmap.png" },
+        { "slug": "best-part", "title": "Best Part", "duration": 219, "dataUrl": "/data/atlas/freudian/songs/best-part.json", "heatmapUrl": "/data/atlas/freudian/songs/best-part-heatmap.png" },
+        { "slug": "hold-me-down", "title": "Hold Me Down", "duration": 190, "dataUrl": "/data/atlas/freudian/songs/hold-me-down.json", "heatmapUrl": "/data/atlas/freudian/songs/hold-me-down-heatmap.png" },
+        { "slug": "freudian", "title": "Freudian", "duration": 310, "dataUrl": "/data/atlas/freudian/songs/freudian.json", "heatmapUrl": "/data/atlas/freudian/songs/freudian-heatmap.png" },
+        { "slug": "we-find-love", "title": "We Find Love", "duration": 204, "dataUrl": "/data/atlas/freudian/songs/we-find-love.json", "heatmapUrl": "/data/atlas/freudian/songs/we-find-love-heatmap.png" },
+        { "slug": "blessed", "title": "Blessed", "duration": 264, "dataUrl": "/data/atlas/freudian/songs/blessed.json", "heatmapUrl": "/data/atlas/freudian/songs/blessed-heatmap.png" },
+        { "slug": "loose", "title": "Loose", "duration": 217, "dataUrl": "/data/atlas/freudian/songs/loose.json", "heatmapUrl": "/data/atlas/freudian/songs/loose-heatmap.png" },
+        { "slug": "transform", "title": "Transform", "duration": 186, "dataUrl": "/data/atlas/freudian/songs/transform.json", "heatmapUrl": "/data/atlas/freudian/songs/transform-heatmap.png" },
+        { "slug": "take-me-away", "title": "Take Me Away", "duration": 246, "dataUrl": "/data/atlas/freudian/songs/take-me-away.json", "heatmapUrl": "/data/atlas/freudian/songs/take-me-away-heatmap.png" }
+      ]
+    },
+    {
+      "slug": "case-study-01",
+      "title": "CASE STUDY 01",
+      "year": 2019,
+      "coverUrl": "/data/atlas/case-study-01/cover.jpg",
+      "palette": {
+        "dominantColors": ["#F59E0B", "#D97706", "#FBBF24", "#92400E", "#78716C", "#FDE68A"]
+      },
+      "songs": [
+        { "slug": "entropy", "title": "Entropy", "duration": 195, "dataUrl": "/data/atlas/case-study-01/songs/entropy.json", "heatmapUrl": "/data/atlas/case-study-01/songs/entropy-heatmap.png" },
+        { "slug": "superposition", "title": "Superposition", "duration": 210, "dataUrl": "/data/atlas/case-study-01/songs/superposition.json", "heatmapUrl": "/data/atlas/case-study-01/songs/superposition-heatmap.png" },
+        { "slug": "open-up", "title": "Open Up", "duration": 238, "dataUrl": "/data/atlas/case-study-01/songs/open-up.json", "heatmapUrl": "/data/atlas/case-study-01/songs/open-up-heatmap.png" },
+        { "slug": "who-hurt-you", "title": "Who Hurt You?", "duration": 227, "dataUrl": "/data/atlas/case-study-01/songs/who-hurt-you.json", "heatmapUrl": "/data/atlas/case-study-01/songs/who-hurt-you-heatmap.png" },
+        { "slug": "love-again", "title": "Love Again", "duration": 241, "dataUrl": "/data/atlas/case-study-01/songs/love-again.json", "heatmapUrl": "/data/atlas/case-study-01/songs/love-again-heatmap.png" }
+      ]
+    },
+    {
+      "slug": "never-enough",
+      "title": "NEVER ENOUGH",
+      "year": 2023,
+      "coverUrl": "/data/atlas/never-enough/cover.jpg",
+      "palette": {
+        "dominantColors": ["#EC4899", "#F472B6", "#BE185D", "#9D174D", "#FCA5A5", "#FECDD3"]
+      },
+      "songs": [
+        { "slug": "do-you-like-me", "title": "Do You Like Me", "duration": 201, "dataUrl": "/data/atlas/never-enough/songs/do-you-like-me.json", "heatmapUrl": "/data/atlas/never-enough/songs/do-you-like-me-heatmap.png" },
+        { "slug": "toronto-2014", "title": "Toronto 2014", "duration": 218, "dataUrl": "/data/atlas/never-enough/songs/toronto-2014.json", "heatmapUrl": "/data/atlas/never-enough/songs/toronto-2014-heatmap.png" },
+        { "slug": "ocho-rios", "title": "Ocho Rios", "duration": 195, "dataUrl": "/data/atlas/never-enough/songs/ocho-rios.json", "heatmapUrl": "/data/atlas/never-enough/songs/ocho-rios-heatmap.png" },
+        { "slug": "let-me-go", "title": "Let Me Go", "duration": 232, "dataUrl": "/data/atlas/never-enough/songs/let-me-go.json", "heatmapUrl": "/data/atlas/never-enough/songs/let-me-go-heatmap.png" }
+      ]
+    },
+    {
+      "slug": "son-of-spergy",
+      "title": "Son of Spergy",
+      "year": 2025,
+      "coverUrl": "/data/atlas/son-of-spergy/cover.jpg",
+      "palette": {
+        "dominantColors": ["#10B981", "#34D399", "#059669", "#047857", "#6EE7B7", "#A7F3D0"]
+      },
+      "songs": [
+        { "slug": "algorithmic-love", "title": "Algorithmic Love", "duration": 215, "dataUrl": "/data/atlas/son-of-spergy/songs/algorithmic-love.json", "heatmapUrl": "/data/atlas/son-of-spergy/songs/algorithmic-love-heatmap.png" },
+        { "slug": "new-genesis", "title": "New Genesis", "duration": 198, "dataUrl": "/data/atlas/son-of-spergy/songs/new-genesis.json", "heatmapUrl": "/data/atlas/son-of-spergy/songs/new-genesis-heatmap.png" },
+        { "slug": "fade-away", "title": "Fade Away", "duration": 243, "dataUrl": "/data/atlas/son-of-spergy/songs/fade-away.json", "heatmapUrl": "/data/atlas/son-of-spergy/songs/fade-away-heatmap.png" }
+      ]
+    }
+  ]
+}

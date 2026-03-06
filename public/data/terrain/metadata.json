@@ -1,0 +1,14 @@
+{
+  "gridSize": 256,
+  "maxElevation": 3,
+  "released": {
+    "title": "Won't Live Here",
+    "description": "Purple fireworks blooming in muted hues that evolve into ember",
+    "heightmapUrl": "/data/terrain/released-heightmap.json"
+  },
+  "unreleased": {
+    "title": "Temporary Lapse in Reasoning",
+    "description": "Blurs of grey fade in and out. The grey has no height.",
+    "heightmapUrl": "/data/terrain/unreleased-heightmap.json"
+  }
+}
