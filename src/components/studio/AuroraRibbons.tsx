@@ -8,11 +8,11 @@ import { useAudioAnalyser } from '@/components/audio/useAudioAnalyser';
 import { detectBeat } from '@/lib/chromesthesia';
 
 // Orbital ring config
-const RING_COUNT = 5;
-const RING_SEGMENTS = 128;
+const RING_COUNT = 3;
+const RING_SEGMENTS = 96;
 
 // Ripple config
-const MAX_RIPPLES = 6;
+const MAX_RIPPLES = 3;
 
 interface Ripple {
   alive: boolean;
@@ -34,7 +34,7 @@ function createRingGeometry(radius: number, tube: number): THREE.TorusGeometry {
  * Creates a flat ring geometry for ripple waves.
  */
 function createRippleGeometry(): THREE.RingGeometry {
-  return new THREE.RingGeometry(0.5, 1.0, 64, 1);
+  return new THREE.RingGeometry(0.9, 1.0, 64, 1);
 }
 
 export default function AuroraRibbons() {
@@ -59,8 +59,8 @@ export default function AuroraRibbons() {
   // Orbital rings
   const rings = useMemo(() => {
     return Array.from({ length: RING_COUNT }, (_, i) => {
-      const radius = 2.5 + i * 0.8;
-      const geo = createRingGeometry(radius, 0.015 + i * 0.005);
+      const radius = 5.0 + i * 1.5;
+      const geo = createRingGeometry(radius, 0.008 + i * 0.003);
       const mat = new THREE.MeshBasicMaterial({
         color: new THREE.Color(0.6, 0.65, 0.8),
         transparent: true,
@@ -72,7 +72,7 @@ export default function AuroraRibbons() {
       return {
         geometry: geo,
         material: mat,
-        orbitSpeed: 0.15 + i * 0.08,
+        orbitSpeed: 0.08 + i * 0.04,
         tiltX: (Math.PI / 4) + (i * 0.25),
         tiltZ: i * 0.3,
         phase: (i / RING_COUNT) * Math.PI * 2,
@@ -132,7 +132,7 @@ export default function AuroraRibbons() {
             pool[i].lifetime = 2.5 + Math.random() * 1.5;
             pool[i].radius = 0.5;
             pool[i].speed = 2.5 + Math.random() * 2;
-            pool[i].intensity = 0.7 + smoothedAmp.current * 2;
+            pool[i].intensity = 0.2 + smoothedAmp.current * 0.5;
             break;
           }
         }
@@ -162,8 +162,8 @@ export default function AuroraRibbons() {
 
       // Opacity: visible when audio plays, brighter on beats
       const targetOpacity = hasAudio
-        ? 0.15 + amp * 0.5 + beatBoost.current * 0.3
-        : 0.03 + Math.sin(t * 0.5 + ring.phase) * 0.02;
+        ? 0.04 + amp * 0.12 + beatBoost.current * 0.08
+        : 0.01 + Math.sin(t * 0.5 + ring.phase) * 0.01;
       ring.material.opacity += (targetOpacity - ring.material.opacity) * 0.1;
 
       // Color shift with amplitude — brighter white on louder audio
@@ -204,7 +204,7 @@ export default function AuroraRibbons() {
       // Fade out as it expands
       const lifeRatio = ripple.age / ripple.lifetime;
       const fadeOut = 1 - lifeRatio * lifeRatio;
-      rippleMeshes[i].material.opacity = fadeOut * ripple.intensity * 0.4;
+      rippleMeshes[i].material.opacity = fadeOut * ripple.intensity * 0.15;
 
       // Slight ring thickness pulse
       const brightness = (0.6 + (1 - lifeRatio) * 0.4);
