@@ -5,10 +5,7 @@ import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { useAudioStore } from '@/stores/audioStore';
 import { useAudioAnalyser } from '@/components/audio/useAudioAnalyser';
-import { detectBeat, fftBinToHz } from '@/lib/chromesthesia';
-import { hslToRgb } from '@/components/shared/ColorUtils';
-
-const SCRIABIN_HUES = [0, 20, 35, 50, 60, 120, 165, 180, 210, 240, 270, 290];
+import { detectBeat } from '@/lib/chromesthesia';
 
 const POOL_SIZE = 2000;
 const BURST_COUNT = 80;
@@ -21,7 +18,7 @@ interface Particle {
   x: number; y: number; z: number;
   vx: number; vy: number; vz: number;
   size: number;
-  hue: number;
+  brightness: number;
 }
 
 const particleVertexShader = `
@@ -54,26 +51,9 @@ const particleFragmentShader = `
   }
 `;
 
-function detectDominantHue(normFreq: Float32Array): number {
-  let peakBin = 1;
-  let peakVal = 0;
-  for (let i = 1; i < normFreq.length; i++) {
-    if (normFreq[i] > peakVal) {
-      peakVal = normFreq[i];
-      peakBin = i;
-    }
-  }
-  const hz = fftBinToHz(peakBin);
-  if (hz <= 0) return 270;
-  const midiNote = Math.round(69 + 12 * Math.log2(hz / 440));
-  const semitone = ((midiNote % 12) + 12) % 12;
-  return SCRIABIN_HUES[semitone];
-}
-
 export default function ParticleBurst() {
   const analyser = useAudioAnalyser();
   const beatHistory = useRef<number[]>([]);
-  const smoothedHue = useRef(270);
   const timeRef = useRef(0);
   const ambientTimer = useRef(0);
 
@@ -86,7 +66,7 @@ export default function ParticleBurst() {
       x: 0, y: 0, z: 0,
       vx: 0, vy: 0, vz: 0,
       size: 1,
-      hue: 270,
+      brightness: 0.8,
     }))
   );
 
@@ -98,7 +78,6 @@ export default function ParticleBurst() {
     const sz = new Float32Array(POOL_SIZE);
     const al = new Float32Array(POOL_SIZE);
 
-    // Initialize off-screen
     for (let i = 0; i < POOL_SIZE; i++) {
       pos[i * 3 + 1] = -100;
       sz[i] = 0;
@@ -124,7 +103,7 @@ export default function ParticleBurst() {
     });
   }, []);
 
-  function spawnBurst(hue: number, count: number, intensity: number) {
+  function spawnBurst(count: number, intensity: number) {
     const pool = particles.current;
     let spawned = 0;
     for (let i = 0; i < POOL_SIZE && spawned < count; i++) {
@@ -137,7 +116,6 @@ export default function ParticleBurst() {
         p.y = 2 + Math.random() * 1;
         p.z = 0;
 
-        // Random spherical burst direction
         const theta = Math.random() * Math.PI * 2;
         const phi = Math.acos(2 * Math.random() - 1);
         const speed = (2 + Math.random() * 4) * intensity;
@@ -146,13 +124,13 @@ export default function ParticleBurst() {
         p.vz = Math.cos(phi) * speed;
 
         p.size = 0.3 + Math.random() * 0.5;
-        p.hue = hue + (Math.random() - 0.5) * 40;
+        p.brightness = 0.6 + Math.random() * 0.4;
         spawned++;
       }
     }
   }
 
-  function spawnAmbient(hue: number) {
+  function spawnAmbient() {
     const pool = particles.current;
     for (let i = 0; i < POOL_SIZE; i++) {
       if (!pool[i].alive) {
@@ -167,7 +145,7 @@ export default function ParticleBurst() {
         p.vy = 0.2 + Math.random() * 0.3;
         p.vz = (Math.random() - 0.5) * 0.3;
         p.size = 0.15 + Math.random() * 0.2;
-        p.hue = hue + (Math.random() - 0.5) * 60;
+        p.brightness = 0.4 + Math.random() * 0.3;
         break;
       }
     }
@@ -184,31 +162,20 @@ export default function ParticleBurst() {
     const normFreq = analyser.normalizedFrequency;
     const hasAudio = isPlaying && normFreq.length > 0 && normFreq.some((v: number) => v > 0);
 
-    // Detect dominant hue
-    if (hasAudio) {
-      const rawHue = detectDominantHue(normFreq);
-      let diff = rawHue - smoothedHue.current;
-      if (diff > 180) diff -= 360;
-      if (diff < -180) diff += 360;
-      smoothedHue.current = ((smoothedHue.current + diff * 0.08) % 360 + 360) % 360;
-    } else {
-      smoothedHue.current = (smoothedHue.current + delta * 8) % 360;
-    }
-
     // Beat detection → spawn burst
     if (hasAudio) {
       const isBeat = detectBeat(normFreq, beatHistory.current, 1.3);
       if (isBeat) {
-        spawnBurst(smoothedHue.current, BURST_COUNT, 1.0);
+        spawnBurst(BURST_COUNT, 1.0);
       }
     }
 
-    // Ambient particles when idle or playing
+    // Ambient particles
     ambientTimer.current += delta;
     const ambientInterval = hasAudio ? 0.15 : 0.3;
     if (ambientTimer.current > ambientInterval) {
       ambientTimer.current = 0;
-      spawnAmbient(smoothedHue.current);
+      spawnAmbient();
     }
 
     // Update all particles
@@ -249,17 +216,13 @@ export default function ParticleBurst() {
       sizes[i] = p.size * (1 - lifeRatio * 0.5);
       alphas[i] = fadeIn * fadeOut * 0.8;
 
-      // Color from particle hue
-      const hue = ((p.hue % 360) + 360) % 360;
-      const sat = 0.7 + (1 - lifeRatio) * 0.3;
-      const lit = 0.3 + (1 - lifeRatio) * 0.35;
-      const [r, g, b] = hslToRgb(hue, sat, lit);
-      colors[i * 3] = r;
-      colors[i * 3 + 1] = g;
+      // Monochrome white/silver color
+      const b = p.brightness * (1 - lifeRatio * 0.4);
+      colors[i * 3] = b * 0.9;
+      colors[i * 3 + 1] = b * 0.92;
       colors[i * 3 + 2] = b;
     }
 
-    // Flag buffers for update
     geometry.attributes.position.needsUpdate = true;
     geometry.attributes.color.needsUpdate = true;
     (geometry.attributes.aSize as THREE.BufferAttribute).needsUpdate = true;

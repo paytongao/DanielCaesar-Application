@@ -6,42 +6,42 @@ import { useFrame } from '@react-three/fiber';
 import Canvas3D from '@/components/shared/Canvas3D';
 import { useAudioStore } from '@/stores/audioStore';
 import { useAudioAnalyser } from '@/components/audio/useAudioAnalyser';
-import { hslToRgb } from '@/components/shared/ColorUtils';
 import {
-  aggregateFrequencyBands,
   gaussianSmooth1D,
   laplacianSmoothY,
-  fftBinToHz,
+  detectBeat,
 } from '@/lib/chromesthesia';
 
 const SIZE = 8;
 const SEGMENTS = 80;
 const VERTEX_COUNT = (SEGMENTS + 1) * (SEGMENTS + 1);
 
-// Scriabin hues for MIDI semitone lookup
-const SCRIABIN_HUES = [0, 20, 35, 50, 60, 120, 165, 180, 210, 240, 270, 290];
-
 /**
- * Find the dominant pitch from FFT data and return its Scriabin hue.
- * Scans for the peak frequency bin, converts to MIDI note, looks up hue.
+ * Simple hash-based pseudo-noise for deterministic random peaks.
+ * Multi-octave sine composition that looks organic.
  */
-function detectDominantHue(normFreq: Float32Array): number {
-  // Find the bin with the highest amplitude (skip bin 0 = DC offset)
-  let peakBin = 1;
-  let peakVal = 0;
-  for (let i = 1; i < normFreq.length; i++) {
-    if (normFreq[i] > peakVal) {
-      peakVal = normFreq[i];
-      peakBin = i;
-    }
-  }
+function noise2D(x: number, y: number, seed: number): number {
+  // 4 octaves of sine-based noise with irrational frequencies
+  const n1 = Math.sin(x * 1.3 + y * 0.7 + seed * 0.13) *
+             Math.cos(y * 1.1 - x * 0.9 + seed * 0.07);
+  const n2 = Math.sin(x * 2.7 + y * 1.9 + seed * 0.31) *
+             Math.cos(y * 2.3 - x * 1.7 + seed * 0.19) * 0.5;
+  const n3 = Math.sin(x * 5.1 + y * 3.7 + seed * 0.53) *
+             Math.cos(y * 4.3 - x * 3.1 + seed * 0.41) * 0.25;
+  const n4 = Math.sin(x * 0.5 + y * 0.3 + seed * 0.71) *
+             Math.cos(y * 0.7 - x * 0.4 + seed * 0.59) * 1.5;
+  return (n1 + n2 + n3 + n4) / 2.25;
+}
 
-  // Convert peak bin to Hz, then to MIDI semitone
-  const hz = fftBinToHz(peakBin);
-  if (hz <= 0) return 270; // fallback: blue
-  const midiNote = Math.round(69 + 12 * Math.log2(hz / 440));
-  const semitone = ((midiNote % 12) + 12) % 12;
-  return SCRIABIN_HUES[semitone];
+// Monochrome gradient: black → grey → white based on normalized height
+function monochromeGradient(t: number): [number, number, number] {
+  // Smooth cubic interpolation for a rich gradient feel
+  const s = t * t * (3 - 2 * t); // smoothstep
+  // Deep charcoal at bottom, cool silver-white at peaks
+  const r = 0.03 + s * 0.87;
+  const g = 0.03 + s * 0.87;
+  const b = 0.05 + s * 0.90; // slight cool tint
+  return [r, g, b];
 }
 
 export function ChromesthesiaSurface() {
@@ -51,10 +51,17 @@ export function ChromesthesiaSurface() {
 
   const analyser = useAudioAnalyser();
 
-  // Smoothed frequency bands for temporal interpolation
-  const smoothedBands = useRef(new Float32Array(SEGMENTS + 1));
-  // Smoothed dominant hue (so color shifts are gradual, not jarring)
-  const smoothedHue = useRef(270); // start blue
+  // Noise seed that shifts on beats for new peak patterns
+  const noiseSeed = useRef(0);
+  const seedTarget = useRef(0);
+  const beatHistory = useRef<number[]>([]);
+
+  // Smoothed amplitude
+  const smoothedAmp = useRef(0);
+
+  // Target heights for smooth interpolation
+  const targetHeights = useRef(new Float32Array(VERTEX_COUNT));
+  const currentHeights = useRef(new Float32Array(VERTEX_COUNT));
 
   const geometry = useMemo(() => {
     const geo = new THREE.PlaneGeometry(SIZE, SIZE, SEGMENTS, SEGMENTS);
@@ -79,95 +86,106 @@ export function ChromesthesiaSurface() {
     const normFreq = analyser.normalizedFrequency;
     const hasAudio = isPlaying && normFreq.length > 0 && normFreq.some((v: number) => v > 0);
 
-    // Detect dominant pitch color from actual audio
-    let dominantHue = smoothedHue.current;
+    // Compute overall audio energy (RMS)
+    let energy = 0;
     if (hasAudio) {
-      const rawHue = detectDominantHue(normFreq);
-      // Smooth hue transitions (shortest path around the 360 wheel)
-      let diff = rawHue - smoothedHue.current;
-      if (diff > 180) diff -= 360;
-      if (diff < -180) diff += 360;
-      smoothedHue.current = ((smoothedHue.current + diff * 0.08) % 360 + 360) % 360;
-      dominantHue = smoothedHue.current;
-    } else {
-      // Slowly drift hue when idle
-      smoothedHue.current = (smoothedHue.current + delta * 8) % 360;
-      dominantHue = smoothedHue.current;
+      let sum = 0;
+      for (let i = 0; i < normFreq.length; i++) sum += normFreq[i] * normFreq[i];
+      energy = Math.sqrt(sum / normFreq.length);
     }
+    // Smooth amplitude
+    smoothedAmp.current += (energy - smoothedAmp.current) * 0.12;
+    const amp = smoothedAmp.current;
 
-    // Get frequency bands — mirrored so peaks radiate from center
-    let bands: number[];
+    // Beat detection: shift noise seed for new peak patterns
     if (hasAudio) {
-      const halfSegs = Math.floor((SEGMENTS + 1) / 2);
-      const raw = aggregateFrequencyBands(normFreq, halfSegs);
-      const smoothed = gaussianSmooth1D(raw, 2);
-      // Power curve to amplify peaks and suppress flat regions
-      for (let i = 0; i < halfSegs; i++) {
-        smoothed[i] = Math.pow(smoothed[i], 0.7) * 1.5;
+      const isBeat = detectBeat(normFreq, beatHistory.current, 1.3);
+      if (isBeat) {
+        seedTarget.current += 2.0 + Math.random() * 3.0;
       }
-      // Mirror: center = low freq (bass), edges = high freq
-      bands = new Array(SEGMENTS + 1);
-      const mid = Math.floor(SEGMENTS / 2);
-      for (let i = 0; i <= SEGMENTS; i++) {
-        const distFromCenter = Math.abs(i - mid);
-        const idx = Math.min(distFromCenter, halfSegs - 1);
-        bands[i] = smoothed[idx];
+    }
+    // Smoothly interpolate seed
+    noiseSeed.current += (seedTarget.current - noiseSeed.current) * 0.04;
+
+    const scale = 8.0;
+
+    // Generate target height field from noise
+    const targets = targetHeights.current;
+    if (hasAudio) {
+      for (let iy = 0; iy <= SEGMENTS; iy++) {
+        for (let ix = 0; ix <= SEGMENTS; ix++) {
+          const idx = iy * (SEGMENTS + 1) + ix;
+          const nx = ix / SEGMENTS;
+          const ny = iy / SEGMENTS;
+
+          // Multi-octave noise driven by time and seed
+          const n = noise2D(nx * 4, ny * 4, noiseSeed.current + t * 0.15);
+          // Only raise peaks (clamp negatives to near-zero for clean valleys)
+          const peak = Math.max(0, n);
+          // Audio amplitude scales the height
+          targets[idx] = peak * amp * scale * 3.0;
+        }
+      }
+
+      // Gaussian smooth the target heights as a 1D array per row
+      // Then transpose and smooth columns for 2D smoothing
+      for (let iy = 0; iy <= SEGMENTS; iy++) {
+        const row = new Array(SEGMENTS + 1);
+        for (let ix = 0; ix <= SEGMENTS; ix++) {
+          row[ix] = targets[iy * (SEGMENTS + 1) + ix];
+        }
+        const smoothed = gaussianSmooth1D(row, 3);
+        for (let ix = 0; ix <= SEGMENTS; ix++) {
+          targets[iy * (SEGMENTS + 1) + ix] = smoothed[ix];
+        }
+      }
+      for (let ix = 0; ix <= SEGMENTS; ix++) {
+        const col = new Array(SEGMENTS + 1);
+        for (let iy = 0; iy <= SEGMENTS; iy++) {
+          col[iy] = targets[iy * (SEGMENTS + 1) + ix];
+        }
+        const smoothed = gaussianSmooth1D(col, 3);
+        for (let iy = 0; iy <= SEGMENTS; iy++) {
+          targets[iy * (SEGMENTS + 1) + ix] = smoothed[iy];
+        }
       }
     } else {
-      // Flat — no displacement until audio plays
-      bands = new Array(SEGMENTS + 1).fill(0);
+      // Flat when no audio
+      targets.fill(0);
     }
 
-    // Temporal smoothing
-    const prev = smoothedBands.current;
-    const alpha = 0.3;
-    for (let i = 0; i <= SEGMENTS; i++) {
-      prev[i] += (bands[i] - prev[i]) * alpha;
+    // Smooth temporal interpolation toward target heights
+    const current = currentHeights.current;
+    const alpha = 0.15;
+    for (let i = 0; i < VERTEX_COUNT; i++) {
+      current[i] += (targets[i] - current[i]) * alpha;
     }
 
+    // Write heights to geometry
     const positions = geometry.attributes.position;
-    const colors = geometry.attributes.color;
     const posArr = positions.array as Float32Array;
+    for (let i = 0; i < VERTEX_COUNT; i++) {
+      posArr[i * 3 + 1] = current[i];
+    }
+
+    // Laplacian smoothing for silk-smooth surface
+    laplacianSmoothY(posArr, SEGMENTS + 1, SEGMENTS + 1, 3);
+
+    // Monochrome gradient coloring based on height
+    const colors = geometry.attributes.color;
     const colArr = colors.array as Float32Array;
 
-    const scale = 8.0; // Much more extreme displacement
-
-    // Displace Y by frequency amplitude
-    for (let i = 0; i < positions.count; i++) {
-      const ix = i % (SEGMENTS + 1);
-      const iy = Math.floor(i / (SEGMENTS + 1));
-
-      const bandValue = prev[ix];
-      const crossBand = prev[iy];
-
-      // Cross-fade with sharper peaks preserved
-      const height = (bandValue * 0.75 + crossBand * 0.25) * scale;
-
-      // Subtle organic wave only when audio is playing
-      let wave = 0;
-      if (hasAudio) {
-        const nx = ix / SEGMENTS;
-        const ny = iy / SEGMENTS;
-        wave = Math.sin(t * 0.8 + nx * 6 + ny * 4) * 0.12 * scale;
-      }
-
-      posArr[i * 3 + 1] = height + wave;
+    // Find max height for normalization
+    let maxH = 0.01;
+    for (let i = 0; i < VERTEX_COUNT; i++) {
+      const h = posArr[i * 3 + 1];
+      if (h > maxH) maxH = h;
     }
 
-    // Less Laplacian smoothing to keep peaks visible
-    laplacianSmoothY(posArr, SEGMENTS + 1, SEGMENTS + 1, 1);
-
-    // Color: single dominant pitch hue, amplitude modulates saturation + lightness
-    for (let i = 0; i < positions.count; i++) {
-      const amp = Math.min(1, Math.max(0, posArr[i * 3 + 1] / scale));
-
-      // Hue = dominant pitch, slight variation with height for depth
-      const hueShift = (amp - 0.5) * 30; // ±15° variation based on height
-      const hue = ((dominantHue + hueShift) % 360 + 360) % 360;
-      const saturation = 0.5 + amp * 0.4; // 50-90%
-      const lightness = 0.15 + amp * 0.45; // 15-60% — dark valleys, bright peaks
-
-      const [r, g, b] = hslToRgb(hue, saturation, lightness);
+    for (let i = 0; i < VERTEX_COUNT; i++) {
+      const h = posArr[i * 3 + 1];
+      const t = Math.max(0, Math.min(1, h / maxH));
+      const [r, g, b] = monochromeGradient(t);
       colArr[i * 3] = r;
       colArr[i * 3 + 1] = g;
       colArr[i * 3 + 2] = b;
@@ -189,8 +207,8 @@ export function ChromesthesiaSurface() {
         <meshStandardMaterial
           vertexColors
           side={THREE.DoubleSide}
-          roughness={0.5}
-          metalness={0.1}
+          roughness={0.4}
+          metalness={0.15}
           toneMapped={false}
         />
       </mesh>
