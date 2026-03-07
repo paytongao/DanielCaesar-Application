@@ -2,7 +2,6 @@
 
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
-import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import { ReactNode, Suspense } from 'react';
 
 interface StudioCanvasProps {
@@ -23,7 +22,7 @@ export default function StudioCanvas({
           near: 0.1,
           far: 1000,
         }}
-        gl={{ antialias: true, alpha: true }}
+        gl={{ antialias: true, alpha: true, toneMappingExposure: 1.2 }}
         dpr={[1, 2]}
       >
         <Suspense fallback={null}>
@@ -41,15 +40,6 @@ export default function StudioCanvas({
             minDistance={3}
             maxDistance={25}
           />
-
-          <EffectComposer>
-            <Bloom
-              intensity={0.8}
-              luminanceThreshold={0.3}
-              luminanceSmoothing={0.9}
-              mipmapBlur
-            />
-          </EffectComposer>
         </Suspense>
       </Canvas>
     </div>
