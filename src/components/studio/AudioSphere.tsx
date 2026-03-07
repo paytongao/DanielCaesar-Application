@@ -44,7 +44,7 @@ function detectDominantHue(normFreq: Float32Array): number {
   return SCRIABIN_HUES[semitone];
 }
 
-function ChromesthesiaSurface() {
+export function ChromesthesiaSurface() {
   const meshRef = useRef<THREE.Mesh>(null);
   const timeRef = useRef(0);
   const groupRef = useRef<THREE.Group>(null);

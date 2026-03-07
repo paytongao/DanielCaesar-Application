@@ -3,17 +3,17 @@
 import dynamic from 'next/dynamic';
 import AudioUpload from '@/components/audio/AudioUpload';
 
-const AudioSphere = dynamic(
-  () => import('@/components/studio/AudioSphere'),
+const StudioScene = dynamic(
+  () => import('@/components/studio/StudioScene'),
   { ssr: false }
 );
 
 export default function StudioPage() {
   return (
     <div className="fixed inset-0 bg-black overflow-hidden">
-      {/* 3D Sphere — full viewport */}
+      {/* Full scene */}
       <div className="absolute inset-0">
-        <AudioSphere />
+        <StudioScene />
       </div>
 
       {/* Title */}
