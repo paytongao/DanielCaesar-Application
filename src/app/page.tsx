@@ -16,8 +16,12 @@ export default function Home() {
 
       {/* Content */}
       <div className="relative z-10 text-center px-6 max-w-3xl">
+        <h1 className="text-6xl sm:text-8xl font-extralight tracking-[0.2em] text-white/90 animate-fade-in">
+          CHROMESTHESIA
+        </h1>
+
         {/* Navigation cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 animate-fade-in-delay">
+        <div className="mt-16 grid grid-cols-1 sm:grid-cols-4 gap-4 animate-fade-in-delay">
           <Link
             href="/atlas"
             className="group p-6 border border-white/10 rounded-lg hover:border-purple-glow/30 transition-all duration-500 hover:bg-white/[0.02]"
