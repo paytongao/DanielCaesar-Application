@@ -35,9 +35,9 @@ function noise2D(x: number, y: number, seed: number): number {
 function surfaceGradient(t: number): [number, number, number] {
   // t in [0, 1] where 0 = lowest valley, 1 = highest peak
   const s = t * t * (3 - 2 * t); // smoothstep
-  const r = 0.06 + s * 0.82;
-  const g = 0.08 + s * 0.85;
-  const b = 0.16 + s * 0.80;
+  const r = 0.04 + s * 0.55;
+  const g = 0.06 + s * 0.65;
+  const b = 0.20 + s * 0.75;
   return [r, g, b];
 }
 
@@ -177,6 +177,8 @@ export function ChromesthesiaSurface() {
           roughness={0.35}
           metalness={0.2}
           toneMapped={false}
+          transparent
+          opacity={0.7}
         />
       </mesh>
     </group>
