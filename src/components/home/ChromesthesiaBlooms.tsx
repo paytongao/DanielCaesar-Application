@@ -125,17 +125,30 @@ function createOrb(w: number, h: number): GradientOrb {
 }
 
 function createBloom(w: number, h: number): Bloom {
-  // Distribute blooms across the full viewport with center bias
-  const cx = w / 2;
-  const cy = h / 2;
-  const spreadX = w * 0.45;
-  const spreadY = h * 0.35;
-  const targetX = cx + (Math.random() - 0.5) * 2 * spreadX;
-  const targetY = cy + (Math.random() - 0.5) * 2 * spreadY - h * 0.05;
+  // Distribute blooms across the entire viewport
+  const targetX = rand(w * 0.02, w * 0.98);
+  const targetY = rand(h * 0.02, h * 0.98);
 
-  // Start from below viewport or from edges
-  const startX = targetX + rand(-60, 60);
-  const startY = h + rand(20, 60);
+  // Start from a random edge (bottom, left, right, or top)
+  let startX: number, startY: number;
+  const edge = Math.random();
+  if (edge < 0.45) {
+    // Bottom (most common — natural firework feel)
+    startX = targetX + rand(-60, 60);
+    startY = h + rand(20, 60);
+  } else if (edge < 0.65) {
+    // Left
+    startX = -rand(20, 60);
+    startY = targetY + rand(-40, 40);
+  } else if (edge < 0.85) {
+    // Right
+    startX = w + rand(20, 60);
+    startY = targetY + rand(-40, 40);
+  } else {
+    // Top
+    startX = targetX + rand(-60, 60);
+    startY = -rand(20, 60);
+  }
 
   const colors = pickN(Math.floor(rand(2, 5)));
 
@@ -271,7 +284,7 @@ export default function ChromesthesiaBlooms() {
     spawnTimerRef.current -= dt;
     if (spawnTimerRef.current <= 0) {
       bloomsRef.current.push(createBloom(w, h));
-      spawnTimerRef.current = rand(0.8, 2.0);
+      spawnTimerRef.current = rand(0.6, 1.6);
     }
 
     // --- Layer 3: Update & draw blooms ---
@@ -433,7 +446,7 @@ export default function ChromesthesiaBlooms() {
     }
 
     // Seed initial blooms already in progress, spread across viewport
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 5; i++) {
       const bloom = createBloom(w, h);
       bloom.phase = 'blooming';
       bloom.y = bloom.targetY;
