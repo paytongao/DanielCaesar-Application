@@ -95,15 +95,23 @@ export function ChromesthesiaSurface() {
       dominantHue = smoothedHue.current;
     }
 
-    // Get frequency bands
+    // Get frequency bands — mirrored so peaks radiate from center
     let bands: number[];
     if (hasAudio) {
-      const raw = aggregateFrequencyBands(normFreq, SEGMENTS + 1);
-      // Less Gaussian smoothing to preserve sharper peaks
-      bands = gaussianSmooth1D(raw, 2);
+      const halfSegs = Math.floor((SEGMENTS + 1) / 2);
+      const raw = aggregateFrequencyBands(normFreq, halfSegs);
+      const smoothed = gaussianSmooth1D(raw, 2);
       // Power curve to amplify peaks and suppress flat regions
+      for (let i = 0; i < halfSegs; i++) {
+        smoothed[i] = Math.pow(smoothed[i], 0.7) * 1.5;
+      }
+      // Mirror: center = low freq (bass), edges = high freq
+      bands = new Array(SEGMENTS + 1);
+      const mid = Math.floor(SEGMENTS / 2);
       for (let i = 0; i <= SEGMENTS; i++) {
-        bands[i] = Math.pow(bands[i], 0.7) * 1.5;
+        const distFromCenter = Math.abs(i - mid);
+        const idx = Math.min(distFromCenter, halfSegs - 1);
+        bands[i] = smoothed[idx];
       }
     } else {
       // Flat — no displacement until audio plays
