@@ -21,26 +21,26 @@ const VERTEX_COUNT = (SEGMENTS + 1) * (SEGMENTS + 1);
  * Multi-octave sine composition that looks organic.
  */
 function noise2D(x: number, y: number, seed: number): number {
-  // 4 octaves of sine-based noise with irrational frequencies
-  const n1 = Math.sin(x * 1.3 + y * 0.7 + seed * 0.13) *
-             Math.cos(y * 1.1 - x * 0.9 + seed * 0.07);
-  const n2 = Math.sin(x * 2.7 + y * 1.9 + seed * 0.31) *
-             Math.cos(y * 2.3 - x * 1.7 + seed * 0.19) * 0.5;
-  const n3 = Math.sin(x * 5.1 + y * 3.7 + seed * 0.53) *
-             Math.cos(y * 4.3 - x * 3.1 + seed * 0.41) * 0.25;
-  const n4 = Math.sin(x * 0.5 + y * 0.3 + seed * 0.71) *
-             Math.cos(y * 0.7 - x * 0.4 + seed * 0.59) * 1.5;
-  return (n1 + n2 + n3 + n4) / 2.25;
+  // Very low frequencies for broad, gentle rolling hills
+  const n1 = Math.sin(x * 0.4 + y * 0.3 + seed * 0.13) *
+             Math.cos(y * 0.35 - x * 0.25 + seed * 0.07);
+  const n2 = Math.sin(x * 0.8 + y * 0.6 + seed * 0.31) *
+             Math.cos(y * 0.7 - x * 0.5 + seed * 0.19) * 0.5;
+  const n3 = Math.sin(x * 1.5 + y * 1.1 + seed * 0.53) *
+             Math.cos(y * 1.3 - x * 0.9 + seed * 0.41) * 0.2;
+  const n4 = Math.sin(x * 0.2 + y * 0.15 + seed * 0.71) *
+             Math.cos(y * 0.25 - x * 0.18 + seed * 0.59) * 1.2;
+  return (n1 + n2 + n3 + n4) / 1.9;
 }
 
 // Monochrome gradient: black → grey → white based on normalized height
 function monochromeGradient(t: number): [number, number, number] {
   // Smooth cubic interpolation for a rich gradient feel
   const s = t * t * (3 - 2 * t); // smoothstep
-  // Deep charcoal at bottom, cool silver-white at peaks
-  const r = 0.03 + s * 0.87;
-  const g = 0.03 + s * 0.87;
-  const b = 0.05 + s * 0.90; // slight cool tint
+  // Soft dark grey at valleys, bright silver-white at peaks
+  const r = 0.12 + s * 0.80;
+  const g = 0.12 + s * 0.80;
+  const b = 0.14 + s * 0.82; // slight cool tint
   return [r, g, b];
 }
 
@@ -118,8 +118,8 @@ export function ChromesthesiaSurface() {
           const nx = ix / SEGMENTS;
           const ny = iy / SEGMENTS;
 
-          // Multi-octave noise driven by time and seed
-          const n = noise2D(nx * 4, ny * 4, noiseSeed.current + t * 0.15);
+          // Broad gentle noise driven by time and seed
+          const n = noise2D(nx * 3, ny * 3, noiseSeed.current + t * 0.1);
           // Only raise peaks (clamp negatives to near-zero for clean valleys)
           const peak = Math.max(0, n);
           // Audio amplitude scales the height
@@ -134,7 +134,7 @@ export function ChromesthesiaSurface() {
         for (let ix = 0; ix <= SEGMENTS; ix++) {
           row[ix] = targets[iy * (SEGMENTS + 1) + ix];
         }
-        const smoothed = gaussianSmooth1D(row, 3);
+        const smoothed = gaussianSmooth1D(row, 5);
         for (let ix = 0; ix <= SEGMENTS; ix++) {
           targets[iy * (SEGMENTS + 1) + ix] = smoothed[ix];
         }
@@ -144,7 +144,7 @@ export function ChromesthesiaSurface() {
         for (let iy = 0; iy <= SEGMENTS; iy++) {
           col[iy] = targets[iy * (SEGMENTS + 1) + ix];
         }
-        const smoothed = gaussianSmooth1D(col, 3);
+        const smoothed = gaussianSmooth1D(col, 5);
         for (let iy = 0; iy <= SEGMENTS; iy++) {
           targets[iy * (SEGMENTS + 1) + ix] = smoothed[iy];
         }
@@ -156,7 +156,7 @@ export function ChromesthesiaSurface() {
 
     // Smooth temporal interpolation toward target heights
     const current = currentHeights.current;
-    const alpha = 0.15;
+    const alpha = 0.08;
     for (let i = 0; i < VERTEX_COUNT; i++) {
       current[i] += (targets[i] - current[i]) * alpha;
     }
@@ -169,7 +169,7 @@ export function ChromesthesiaSurface() {
     }
 
     // Laplacian smoothing for silk-smooth surface
-    laplacianSmoothY(posArr, SEGMENTS + 1, SEGMENTS + 1, 3);
+    laplacianSmoothY(posArr, SEGMENTS + 1, SEGMENTS + 1, 5);
 
     // Monochrome gradient coloring based on height
     const colors = geometry.attributes.color;
