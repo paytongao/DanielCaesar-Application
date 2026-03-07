@@ -106,19 +106,8 @@ export function ChromesthesiaSurface() {
         bands[i] = Math.pow(bands[i], 0.7) * 1.5;
       }
     } else {
-      // Procedural surface
-      bands = [];
-      for (let i = 0; i <= SEGMENTS; i++) {
-        const x = i / SEGMENTS;
-        const bass = Math.exp(-x * 8) * 0.6;
-        const mid = Math.exp(-Math.pow(x - 0.3, 2) * 30) * 0.5;
-        const presence = Math.exp(-Math.pow(x - 0.55, 2) * 50) * 0.35;
-        const air = Math.exp(-Math.pow(x - 0.8, 2) * 70) * 0.2;
-        const mod1 = Math.sin(t * 1.5 + x * 12) * 0.1;
-        const mod2 = Math.sin(t * 2.2 + x * 8) * 0.07;
-        const breathe = Math.sin(t * 0.4) * 0.06 + 0.05;
-        bands.push(Math.max(0.02, bass + mid + presence + air + mod1 + mod2 + breathe));
-      }
+      // Flat — no displacement until audio plays
+      bands = new Array(SEGMENTS + 1).fill(0);
     }
 
     // Temporal smoothing
@@ -146,10 +135,13 @@ export function ChromesthesiaSurface() {
       // Cross-fade with sharper peaks preserved
       const height = (bandValue * 0.75 + crossBand * 0.25) * scale;
 
-      // Subtle organic wave
-      const nx = ix / SEGMENTS;
-      const ny = iy / SEGMENTS;
-      const wave = Math.sin(t * 0.8 + nx * 6 + ny * 4) * 0.12 * scale;
+      // Subtle organic wave only when audio is playing
+      let wave = 0;
+      if (hasAudio) {
+        const nx = ix / SEGMENTS;
+        const ny = iy / SEGMENTS;
+        wave = Math.sin(t * 0.8 + nx * 6 + ny * 4) * 0.12 * scale;
+      }
 
       posArr[i * 3 + 1] = height + wave;
     }
