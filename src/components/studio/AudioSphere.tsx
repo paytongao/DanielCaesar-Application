@@ -37,10 +37,10 @@ function noise2D(x: number, y: number, seed: number): number {
 function monochromeGradient(t: number): [number, number, number] {
   // Smooth cubic interpolation for a rich gradient feel
   const s = t * t * (3 - 2 * t); // smoothstep
-  // Soft dark grey at valleys, bright silver-white at peaks
-  const r = 0.12 + s * 0.80;
-  const g = 0.12 + s * 0.80;
-  const b = 0.14 + s * 0.82; // slight cool tint
+  // Dark blue-grey valleys → light blue-white peaks
+  const r = 0.08 + s * 0.75;
+  const g = 0.10 + s * 0.80;
+  const b = 0.18 + s * 0.78; // stronger blue tint
   return [r, g, b];
 }
 
