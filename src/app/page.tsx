@@ -10,7 +10,7 @@ const ChromesthesiaBlooms = dynamic(
 
 export default function Home() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden -mt-16 pt-16">
+    <div className="h-[calc(100vh-4rem)] flex flex-col items-center justify-center relative overflow-hidden">
       {/* Chromesthesia firework blooms */}
       <ChromesthesiaBlooms />
 
