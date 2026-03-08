@@ -13,58 +13,52 @@ const SEGMENTS = 80;
 const VERTEX_COUNT = (SEGMENTS + 1) * (SEGMENTS + 1);
 
 /**
- * Multi-octave sine noise — smooth rolling terrain.
- * Time is baked into the seed so the landscape flows continuously.
+ * Multi-octave sine noise. Centered coordinates so no side bias.
  */
 function noise2D(x: number, y: number, seed: number): number {
-  const n1 = Math.sin(x * 0.7 + y * 0.5 + seed * 0.13) *
-             Math.cos(y * 0.6 - x * 0.4 + seed * 0.07);
-  const n2 = Math.sin(x * 1.4 + y * 1.0 + seed * 0.31) *
-             Math.cos(y * 1.2 - x * 0.8 + seed * 0.19) * 0.5;
-  const n3 = Math.sin(x * 2.5 + y * 1.8 + seed * 0.53) *
-             Math.cos(y * 2.1 - x * 1.5 + seed * 0.41) * 0.25;
-  const n4 = Math.sin(x * 0.3 + y * 0.2 + seed * 0.71) *
-             Math.cos(y * 0.35 - x * 0.25 + seed * 0.59) * 0.8;
+  // Center the coordinates around 0 to avoid spatial bias
+  const cx = x - 2.0;
+  const cy = y - 2.0;
+  const n1 = Math.sin(cx * 0.7 + cy * 0.5 + seed * 0.13) *
+             Math.cos(cy * 0.6 - cx * 0.4 + seed * 0.07);
+  const n2 = Math.sin(cx * 1.4 + cy * 1.0 + seed * 0.31) *
+             Math.cos(cy * 1.2 - cx * 0.8 + seed * 0.19) * 0.5;
+  const n3 = Math.sin(cx * 2.5 + cy * 1.8 + seed * 0.53) *
+             Math.cos(cy * 2.1 - cx * 1.5 + seed * 0.41) * 0.25;
+  const n4 = Math.sin(cx * 0.3 + cy * 0.2 + seed * 0.71) *
+             Math.cos(cy * 0.35 - cx * 0.25 + seed * 0.59) * 0.8;
   return (n1 + n2 + n3 + n4) / 2.55;
 }
 
-// Multi-shade blue gradient: deep navy → royal blue → sky blue → icy white
-// Five control points for rich variation
+/**
+ * Drastic multi-shade blue gradient with neon blues, dark navy, and white.
+ * Uses emissive-friendly colors (unlit material shows these directly).
+ */
 function surfaceGradient(t: number): [number, number, number] {
-  // 0.0 = deep navy, 0.25 = dark royal, 0.5 = medium blue,
-  // 0.75 = light translucent blue, 1.0 = icy blue-white
-  if (t < 0.25) {
-    const s = t / 0.25;
-    // Deep navy → dark royal blue
-    return [
-      0.01 + s * 0.02,
-      0.02 + s * 0.04,
-      0.12 + s * 0.18,
-    ];
-  } else if (t < 0.5) {
-    const s = (t - 0.25) / 0.25;
-    // Dark royal → medium blue
-    return [
-      0.03 + s * 0.05,
-      0.06 + s * 0.10,
-      0.30 + s * 0.15,
-    ];
+  if (t < 0.15) {
+    // Very deep navy / near-black blue
+    const s = t / 0.15;
+    return [0.005 + s * 0.01, 0.005 + s * 0.015, 0.04 + s * 0.08];
+  } else if (t < 0.35) {
+    // Dark navy → rich dark blue
+    const s = (t - 0.15) / 0.2;
+    return [0.015 + s * 0.01, 0.02 + s * 0.03, 0.12 + s * 0.20];
+  } else if (t < 0.55) {
+    // Rich blue → neon electric blue
+    const s = (t - 0.35) / 0.2;
+    return [0.025 + s * 0.05, 0.05 + s * 0.20, 0.32 + s * 0.45];
   } else if (t < 0.75) {
-    const s = (t - 0.5) / 0.25;
-    // Medium blue → light translucent blue
-    return [
-      0.08 + s * 0.15,
-      0.16 + s * 0.22,
-      0.45 + s * 0.20,
-    ];
+    // Neon blue → bright cyan-blue
+    const s = (t - 0.55) / 0.2;
+    return [0.075 + s * 0.25, 0.25 + s * 0.40, 0.77 + s * 0.18];
+  } else if (t < 0.9) {
+    // Bright cyan-blue → light icy blue
+    const s = (t - 0.75) / 0.15;
+    return [0.325 + s * 0.35, 0.65 + s * 0.20, 0.95 - s * 0.05];
   } else {
-    const s = (t - 0.75) / 0.25;
-    // Light blue → icy blue-white
-    return [
-      0.23 + s * 0.52,
-      0.38 + s * 0.45,
-      0.65 + s * 0.30,
-    ];
+    // Icy blue → white
+    const s = (t - 0.9) / 0.1;
+    return [0.675 + s * 0.32, 0.85 + s * 0.15, 0.90 + s * 0.10];
   }
 }
 
@@ -75,10 +69,7 @@ export function ChromesthesiaSurface() {
 
   const analyser = useAudioAnalyser();
 
-  // Smoothed amplitude — very slow response for breathing feel
   const smoothedAmp = useRef(0);
-
-  // Heights for smooth interpolation
   const currentHeights = useRef(new Float32Array(VERTEX_COUNT));
 
   const geometry = useMemo(() => {
@@ -95,7 +86,6 @@ export function ChromesthesiaSurface() {
     if (!meshRef.current) return;
 
     const isPlaying = useAudioStore.getState().isPlaying;
-    // Always advance time — slow, continuous
     timeRef.current += delta;
 
     if (isPlaying) {
@@ -106,51 +96,56 @@ export function ChromesthesiaSurface() {
     const normFreq = analyser.normalizedFrequency;
     const hasAudio = isPlaying && normFreq.length > 0 && normFreq.some((v: number) => v > 0);
 
-    // Compute audio energy — very slow smoothing for breathing feel
+    // Compute audio energy
     let energy = 0;
     if (hasAudio) {
       let sum = 0;
       for (let i = 0; i < normFreq.length; i++) sum += normFreq[i] * normFreq[i];
       energy = Math.sqrt(sum / normFreq.length);
     }
-    // Very slow EMA — no sudden jumps, just gradual breathing
-    smoothedAmp.current += (energy - smoothedAmp.current) * 0.03;
+    // Faster smoothing so it actually responds to the music
+    smoothedAmp.current += (energy - smoothedAmp.current) * 0.08;
     const amp = smoothedAmp.current;
 
-    // Height scale: gentle idle, grows with sustained audio energy
+    // Height scale — more responsive to audio
     const idleScale = 1.5;
-    const audioScale = 2.0 + amp * 18.0;
+    const audioScale = 3.0 + amp * 30.0;
     const scale = hasAudio ? audioScale : idleScale;
 
-    // Generate target heights — time drives continuous slow evolution
-    // No beat-based seed jumping. Just smooth time flow.
-    const seed = t * 0.04; // very slow drift
+    const seed = t * 0.04;
 
     const positions = geometry.attributes.position;
     const posArr = positions.array as Float32Array;
     const current = currentHeights.current;
 
+    // Generate noise field and compute mean for centering
+    const rawNoise = new Float32Array(VERTEX_COUNT);
+    let noiseMean = 0;
     for (let iy = 0; iy <= SEGMENTS; iy++) {
       for (let ix = 0; ix <= SEGMENTS; ix++) {
         const idx = iy * (SEGMENTS + 1) + ix;
         const nx = ix / SEGMENTS;
         const ny = iy / SEGMENTS;
-
-        const n = noise2D(nx * 4, ny * 4, seed);
-        const target = n * scale;
-
-        // Very slow interpolation — smooth breathing motion
-        const alpha = 0.04;
-        current[idx] += (target - current[idx]) * alpha;
-
-        posArr[idx * 3 + 1] = current[idx];
+        rawNoise[idx] = noise2D(nx * 4, ny * 4, seed);
+        noiseMean += rawNoise[idx];
       }
+    }
+    noiseMean /= VERTEX_COUNT;
+
+    // Apply centered noise with scale
+    for (let i = 0; i < VERTEX_COUNT; i++) {
+      const target = (rawNoise[i] - noiseMean) * scale;
+
+      // Smooth interpolation — responsive but not jerky
+      const alpha = hasAudio ? 0.07 : 0.04;
+      current[i] += (target - current[i]) * alpha;
+      posArr[i * 3 + 1] = current[i];
     }
 
     // Laplacian smoothing
     laplacianSmoothY(posArr, SEGMENTS + 1, SEGMENTS + 1, 2);
 
-    // Color based on height
+    // Color based on height — full gradient range
     const colors = geometry.attributes.color;
     const colArr = colors.array as Float32Array;
 
@@ -176,7 +171,6 @@ export function ChromesthesiaSurface() {
     colors.needsUpdate = true;
     geometry.computeVertexNormals();
 
-    // Slow auto-rotation
     if (groupRef.current) {
       groupRef.current.rotation.y += delta * 0.04;
     }
@@ -185,14 +179,12 @@ export function ChromesthesiaSurface() {
   return (
     <group ref={groupRef}>
       <mesh ref={meshRef} geometry={geometry}>
-        <meshStandardMaterial
+        <meshBasicMaterial
           vertexColors
           side={THREE.DoubleSide}
-          roughness={0.3}
-          metalness={0.25}
-          toneMapped={false}
           transparent
-          opacity={0.75}
+          opacity={0.85}
+          toneMapped={false}
         />
       </mesh>
     </group>
