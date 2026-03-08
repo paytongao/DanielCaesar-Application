@@ -12,6 +12,18 @@ const SIZE = 8;
 const SEGMENTS = 80;
 const VERTEX_COUNT = (SEGMENTS + 1) * (SEGMENTS + 1);
 
+// Subtle localized bursts that add organic randomness
+const MAX_BURSTS = 8;
+interface Burst {
+  alive: boolean;
+  age: number;
+  lifetime: number;
+  cx: number; // center x (0-1)
+  cy: number; // center y (0-1)
+  radius: number; // spread radius (in grid units)
+  strength: number; // peak height multiplier
+}
+
 /**
  * Multi-octave sine noise. Centered coordinates so no side bias.
  */
@@ -78,6 +90,12 @@ export function ChromesthesiaSurface() {
 
   const smoothedAmp = useRef(0);
   const currentHeights = useRef(new Float32Array(VERTEX_COUNT));
+  const burstTimer = useRef(0);
+  const bursts = useRef<Burst[]>(
+    Array.from({ length: MAX_BURSTS }, () => ({
+      alive: false, age: 0, lifetime: 3, cx: 0, cy: 0, radius: 0.15, strength: 1,
+    }))
+  );
 
   const geometry = useMemo(() => {
     const geo = new THREE.PlaneGeometry(SIZE, SIZE, SEGMENTS, SEGMENTS);
@@ -139,9 +157,59 @@ export function ChromesthesiaSurface() {
     }
     noiseMean /= VERTEX_COUNT;
 
-    // Apply centered noise with scale
+    // Spawn random bursts at irregular intervals
+    burstTimer.current += delta;
+    const spawnInterval = hasAudio ? 0.8 + Math.random() * 1.2 : 2.0 + Math.random() * 2.0;
+    if (burstTimer.current > spawnInterval) {
+      burstTimer.current = 0;
+      const pool = bursts.current;
+      for (let i = 0; i < MAX_BURSTS; i++) {
+        if (!pool[i].alive) {
+          pool[i].alive = true;
+          pool[i].age = 0;
+          pool[i].lifetime = 1.5 + Math.random() * 3.0;
+          pool[i].cx = 0.1 + Math.random() * 0.8;
+          pool[i].cy = 0.1 + Math.random() * 0.8;
+          pool[i].radius = 0.06 + Math.random() * 0.14;
+          pool[i].strength = (0.3 + Math.random() * 0.7) * (hasAudio ? 1 + amp * 3 : 0.4);
+          break;
+        }
+      }
+    }
+
+    // Age bursts
+    for (let i = 0; i < MAX_BURSTS; i++) {
+      const b = bursts.current[i];
+      if (b.alive) {
+        b.age += delta;
+        if (b.age >= b.lifetime) b.alive = false;
+      }
+    }
+
+    // Apply centered noise with scale + burst contributions
     for (let i = 0; i < VERTEX_COUNT; i++) {
-      const target = (rawNoise[i] - noiseMean) * scale;
+      const iy = Math.floor(i / (SEGMENTS + 1));
+      const ix = i % (SEGMENTS + 1);
+      const nx = ix / SEGMENTS;
+      const ny = iy / SEGMENTS;
+
+      let burstContrib = 0;
+      for (let bi = 0; bi < MAX_BURSTS; bi++) {
+        const b = bursts.current[bi];
+        if (!b.alive) continue;
+        const dx = nx - b.cx;
+        const dy = ny - b.cy;
+        const dist2 = (dx * dx + dy * dy) / (b.radius * b.radius);
+        if (dist2 < 9) { // within 3 radii
+          const gaussian = Math.exp(-dist2 * 0.5);
+          // Smooth fade in/out over lifetime
+          const life = b.age / b.lifetime;
+          const envelope = Math.sin(life * Math.PI); // 0→1→0
+          burstContrib += gaussian * envelope * b.strength * scale * 0.3;
+        }
+      }
+
+      const target = (rawNoise[i] - noiseMean) * scale + burstContrib;
 
       // Smooth interpolation — responsive but not jerky
       const alpha = hasAudio ? 0.07 : 0.04;
@@ -179,7 +247,10 @@ export function ChromesthesiaSurface() {
     geometry.computeVertexNormals();
 
     if (groupRef.current) {
-      groupRef.current.rotation.y += delta * 0.04;
+      // Slow rotation with subtle oscillation
+      groupRef.current.rotation.y += delta * 0.06;
+      groupRef.current.rotation.x = Math.sin(t * 0.15) * 0.06;
+      groupRef.current.rotation.z = Math.cos(t * 0.12) * 0.04;
     }
   });
 
