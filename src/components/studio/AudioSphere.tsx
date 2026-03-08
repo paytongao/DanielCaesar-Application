@@ -28,13 +28,44 @@ function noise2D(x: number, y: number, seed: number): number {
   return (n1 + n2 + n3 + n4) / 2.55;
 }
 
-// Deep blue valleys → icy blue-white peaks
+// Multi-shade blue gradient: deep navy → royal blue → sky blue → icy white
+// Five control points for rich variation
 function surfaceGradient(t: number): [number, number, number] {
-  const s = t * t * (3 - 2 * t); // smoothstep
-  const r = 0.02 + s * 0.40;
-  const g = 0.04 + s * 0.55;
-  const b = 0.22 + s * 0.73;
-  return [r, g, b];
+  // 0.0 = deep navy, 0.25 = dark royal, 0.5 = medium blue,
+  // 0.75 = light translucent blue, 1.0 = icy blue-white
+  if (t < 0.25) {
+    const s = t / 0.25;
+    // Deep navy → dark royal blue
+    return [
+      0.01 + s * 0.02,
+      0.02 + s * 0.04,
+      0.12 + s * 0.18,
+    ];
+  } else if (t < 0.5) {
+    const s = (t - 0.25) / 0.25;
+    // Dark royal → medium blue
+    return [
+      0.03 + s * 0.05,
+      0.06 + s * 0.10,
+      0.30 + s * 0.15,
+    ];
+  } else if (t < 0.75) {
+    const s = (t - 0.5) / 0.25;
+    // Medium blue → light translucent blue
+    return [
+      0.08 + s * 0.15,
+      0.16 + s * 0.22,
+      0.45 + s * 0.20,
+    ];
+  } else {
+    const s = (t - 0.75) / 0.25;
+    // Light blue → icy blue-white
+    return [
+      0.23 + s * 0.52,
+      0.38 + s * 0.45,
+      0.65 + s * 0.30,
+    ];
+  }
 }
 
 export function ChromesthesiaSurface() {
