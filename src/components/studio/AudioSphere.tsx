@@ -16,18 +16,25 @@ const VERTEX_COUNT = (SEGMENTS + 1) * (SEGMENTS + 1);
  * Multi-octave sine noise. Centered coordinates so no side bias.
  */
 function noise2D(x: number, y: number, seed: number): number {
-  // Center the coordinates around 0 to avoid spatial bias
+  // Center coordinates to avoid spatial bias
   const cx = x - 2.0;
   const cy = y - 2.0;
-  const n1 = Math.sin(cx * 0.7 + cy * 0.5 + seed * 0.13) *
-             Math.cos(cy * 0.6 - cx * 0.4 + seed * 0.07);
-  const n2 = Math.sin(cx * 1.4 + cy * 1.0 + seed * 0.31) *
-             Math.cos(cy * 1.2 - cx * 0.8 + seed * 0.19) * 0.5;
-  const n3 = Math.sin(cx * 2.5 + cy * 1.8 + seed * 0.53) *
-             Math.cos(cy * 2.1 - cx * 1.5 + seed * 0.41) * 0.25;
-  const n4 = Math.sin(cx * 0.3 + cy * 0.2 + seed * 0.71) *
-             Math.cos(cy * 0.35 - cx * 0.25 + seed * 0.59) * 0.8;
-  return (n1 + n2 + n3 + n4) / 2.55;
+  // Broad base hills
+  const n1 = Math.sin(cx * 0.6 + cy * 0.4 + seed * 0.13) *
+             Math.cos(cy * 0.5 - cx * 0.35 + seed * 0.07);
+  // Medium features
+  const n2 = Math.sin(cx * 1.3 + cy * 0.9 + seed * 0.31) *
+             Math.cos(cy * 1.1 - cx * 0.7 + seed * 0.19) * 0.6;
+  // Sharp peaks — higher frequency, stronger weight for dramatic spikes
+  const n3 = Math.sin(cx * 2.8 + cy * 2.0 + seed * 0.53) *
+             Math.cos(cy * 2.4 - cx * 1.6 + seed * 0.41) * 0.4;
+  // Very sharp detail
+  const n4 = Math.sin(cx * 4.5 + cy * 3.2 + seed * 0.67) *
+             Math.cos(cy * 3.8 - cx * 2.6 + seed * 0.43) * 0.2;
+  // Ultra-broad swell
+  const n5 = Math.sin(cx * 0.25 + cy * 0.18 + seed * 0.71) *
+             Math.cos(cy * 0.3 - cx * 0.2 + seed * 0.59) * 0.7;
+  return (n1 + n2 + n3 + n4 + n5) / 2.9;
 }
 
 /**
@@ -143,7 +150,7 @@ export function ChromesthesiaSurface() {
     }
 
     // Laplacian smoothing
-    laplacianSmoothY(posArr, SEGMENTS + 1, SEGMENTS + 1, 2);
+    laplacianSmoothY(posArr, SEGMENTS + 1, SEGMENTS + 1, 1);
 
     // Color based on height — full gradient range
     const colors = geometry.attributes.color;
