@@ -26,10 +26,10 @@ export default function StudioCanvas({
         dpr={[1, 2]}
       >
         <Suspense fallback={null}>
-          <ambientLight intensity={0.6} />
-          <directionalLight position={[5, 10, 5]} intensity={0.9} />
-          <pointLight position={[0, 8, 0]} intensity={0.6} color="#a0c4f0" />
-          <pointLight position={[-4, 5, 4]} intensity={0.3} color="#b8d4f8" />
+          <ambientLight intensity={0.4} color="#8090c0" />
+          <directionalLight position={[5, 10, 5]} intensity={0.7} color="#90a8e0" />
+          <pointLight position={[0, 8, 0]} intensity={0.6} color="#6088d0" />
+          <pointLight position={[-4, 5, 4]} intensity={0.3} color="#7098e0" />
 
           {children}
 

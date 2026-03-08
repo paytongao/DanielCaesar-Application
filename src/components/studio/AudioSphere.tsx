@@ -6,18 +6,15 @@ import { useFrame } from '@react-three/fiber';
 import Canvas3D from '@/components/shared/Canvas3D';
 import { useAudioStore } from '@/stores/audioStore';
 import { useAudioAnalyser } from '@/components/audio/useAudioAnalyser';
-import {
-  laplacianSmoothY,
-  detectBeat,
-} from '@/lib/chromesthesia';
+import { laplacianSmoothY } from '@/lib/chromesthesia';
 
 const SIZE = 8;
 const SEGMENTS = 80;
 const VERTEX_COUNT = (SEGMENTS + 1) * (SEGMENTS + 1);
 
 /**
- * Multi-octave sine noise — produces smooth rolling terrain.
- * Returns values in roughly [-1, 1] range.
+ * Multi-octave sine noise — smooth rolling terrain.
+ * Time is baked into the seed so the landscape flows continuously.
  */
 function noise2D(x: number, y: number, seed: number): number {
   const n1 = Math.sin(x * 0.7 + y * 0.5 + seed * 0.13) *
@@ -31,13 +28,12 @@ function noise2D(x: number, y: number, seed: number): number {
   return (n1 + n2 + n3 + n4) / 2.55;
 }
 
-// Blue-white gradient: dark blue valleys → bright blue-white peaks
+// Deep blue valleys → icy blue-white peaks
 function surfaceGradient(t: number): [number, number, number] {
-  // t in [0, 1] where 0 = lowest valley, 1 = highest peak
   const s = t * t * (3 - 2 * t); // smoothstep
-  const r = 0.04 + s * 0.55;
-  const g = 0.06 + s * 0.65;
-  const b = 0.20 + s * 0.75;
+  const r = 0.02 + s * 0.40;
+  const g = 0.04 + s * 0.55;
+  const b = 0.22 + s * 0.73;
   return [r, g, b];
 }
 
@@ -48,12 +44,7 @@ export function ChromesthesiaSurface() {
 
   const analyser = useAudioAnalyser();
 
-  // Noise seed that shifts on beats
-  const noiseSeed = useRef(0);
-  const seedTarget = useRef(0);
-  const beatHistory = useRef<number[]>([]);
-
-  // Smoothed amplitude
+  // Smoothed amplitude — very slow response for breathing feel
   const smoothedAmp = useRef(0);
 
   // Heights for smooth interpolation
@@ -73,7 +64,7 @@ export function ChromesthesiaSurface() {
     if (!meshRef.current) return;
 
     const isPlaying = useAudioStore.getState().isPlaying;
-    // Always advance time for idle animation
+    // Always advance time — slow, continuous
     timeRef.current += delta;
 
     if (isPlaying) {
@@ -84,30 +75,26 @@ export function ChromesthesiaSurface() {
     const normFreq = analyser.normalizedFrequency;
     const hasAudio = isPlaying && normFreq.length > 0 && normFreq.some((v: number) => v > 0);
 
-    // Compute audio energy
+    // Compute audio energy — very slow smoothing for breathing feel
     let energy = 0;
     if (hasAudio) {
       let sum = 0;
       for (let i = 0; i < normFreq.length; i++) sum += normFreq[i] * normFreq[i];
       energy = Math.sqrt(sum / normFreq.length);
     }
-    smoothedAmp.current += (energy - smoothedAmp.current) * 0.12;
+    // Very slow EMA — no sudden jumps, just gradual breathing
+    smoothedAmp.current += (energy - smoothedAmp.current) * 0.03;
+    const amp = smoothedAmp.current;
 
-    // Beat detection: shift noise seed
-    if (hasAudio) {
-      const isBeat = detectBeat(normFreq, beatHistory.current, 1.3);
-      if (isBeat) {
-        seedTarget.current += 1.5 + Math.random() * 2.0;
-      }
-    }
-    noiseSeed.current += (seedTarget.current - noiseSeed.current) * 0.03;
-
-    // Height scale: idle has gentle waves, audio amplifies dramatically
-    const idleScale = 1.2;
-    const audioScale = 4.0 + smoothedAmp.current * 20.0;
+    // Height scale: gentle idle, grows with sustained audio energy
+    const idleScale = 1.5;
+    const audioScale = 2.0 + amp * 18.0;
     const scale = hasAudio ? audioScale : idleScale;
 
-    // Generate target heights from noise
+    // Generate target heights — time drives continuous slow evolution
+    // No beat-based seed jumping. Just smooth time flow.
+    const seed = t * 0.04; // very slow drift
+
     const positions = geometry.attributes.position;
     const posArr = positions.array as Float32Array;
     const current = currentHeights.current;
@@ -118,28 +105,24 @@ export function ChromesthesiaSurface() {
         const nx = ix / SEGMENTS;
         const ny = iy / SEGMENTS;
 
-        // Noise with both peaks AND valleys (full range, not clamped)
-        const n = noise2D(nx * 4, ny * 4, noiseSeed.current + t * 0.08);
-
-        // Target height
+        const n = noise2D(nx * 4, ny * 4, seed);
         const target = n * scale;
 
-        // Smooth temporal interpolation — gentle rise/fall
-        const alpha = hasAudio ? 0.12 : 0.06;
+        // Very slow interpolation — smooth breathing motion
+        const alpha = 0.04;
         current[idx] += (target - current[idx]) * alpha;
 
         posArr[idx * 3 + 1] = current[idx];
       }
     }
 
-    // Laplacian smoothing — just 2 passes for smooth but not flat
+    // Laplacian smoothing
     laplacianSmoothY(posArr, SEGMENTS + 1, SEGMENTS + 1, 2);
 
     // Color based on height
     const colors = geometry.attributes.color;
     const colArr = colors.array as Float32Array;
 
-    // Find min/max for normalization
     let minH = Infinity;
     let maxH = -Infinity;
     for (let i = 0; i < VERTEX_COUNT; i++) {
@@ -151,7 +134,7 @@ export function ChromesthesiaSurface() {
 
     for (let i = 0; i < VERTEX_COUNT; i++) {
       const h = posArr[i * 3 + 1];
-      const normalized = (h - minH) / range; // 0 to 1
+      const normalized = (h - minH) / range;
       const [r, g, b] = surfaceGradient(normalized);
       colArr[i * 3] = r;
       colArr[i * 3 + 1] = g;
@@ -164,7 +147,7 @@ export function ChromesthesiaSurface() {
 
     // Slow auto-rotation
     if (groupRef.current) {
-      groupRef.current.rotation.y += delta * 0.06;
+      groupRef.current.rotation.y += delta * 0.04;
     }
   });
 
@@ -174,11 +157,11 @@ export function ChromesthesiaSurface() {
         <meshStandardMaterial
           vertexColors
           side={THREE.DoubleSide}
-          roughness={0.35}
-          metalness={0.2}
+          roughness={0.3}
+          metalness={0.25}
           toneMapped={false}
           transparent
-          opacity={0.7}
+          opacity={0.75}
         />
       </mesh>
     </group>
